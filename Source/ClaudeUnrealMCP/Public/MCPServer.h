@@ -123,6 +123,16 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Niagara VFX (Sprint 19)
+	FString HandleSpawnNiagaraSystem(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetNiagaraParameter(const TSharedPtr<FJsonObject>& Params);
+	FString HandleNiagaraControl(const TSharedPtr<FJsonObject>& Params);
+
+	// Data Tables (Sprint 20)
+	FString HandleCreateDataTable(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadDataTable(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddDataTableRow(const TSharedPtr<FJsonObject>& Params);
+
 	// Sequencer / Cinematics (Sprint 18)
 	FString HandleCreateLevelSequence(const TSharedPtr<FJsonObject>& Params);
 	FString HandleReadLevelSequence(const TSharedPtr<FJsonObject>& Params);

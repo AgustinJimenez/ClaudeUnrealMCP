@@ -1693,6 +1693,89 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 19 — Niagara VFX
+      {
+        name: "spawn_niagara_system",
+        description: "Spawn a Niagara particle system at a location in the level.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            system_path: { type: "string", description: "Niagara system asset path" },
+            x: { type: "number", description: "X location" },
+            y: { type: "number", description: "Y location" },
+            z: { type: "number", description: "Z location" },
+            pitch: { type: "number" }, yaw: { type: "number" },
+            auto_destroy: { type: "boolean", description: "Auto-destroy when finished (default false)" },
+          },
+          required: ["system_path"],
+        },
+      },
+      {
+        name: "set_niagara_parameter",
+        description: "Set a parameter on a Niagara component by actor name. Types: float, int, vector, color.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label with NiagaraComponent" },
+            param_name: { type: "string", description: "Parameter name" },
+            param_type: { type: "string", description: "float, int, vector, or color" },
+            value: { type: "number", description: "For float/int" },
+            x: { type: "number" }, y: { type: "number" }, z: { type: "number" },
+            r: { type: "number" }, g: { type: "number" }, b: { type: "number" }, a: { type: "number" },
+          },
+          required: ["actor_name", "param_name", "param_type"],
+        },
+      },
+      {
+        name: "niagara_control",
+        description: "Control a Niagara system on an actor: activate, deactivate, or reset.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label" },
+            operation: { type: "string", description: "activate, deactivate, or reset" },
+          },
+          required: ["actor_name", "operation"],
+        },
+      },
+      // Sprint 20 — Data Tables
+      {
+        name: "create_data_table",
+        description: "Create a new Data Table asset with a specified row struct.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "Data table name" },
+            row_struct: { type: "string", description: "Row struct path or name (e.g. struct name or full path)" },
+          },
+          required: ["asset_path", "asset_name", "row_struct"],
+        },
+      },
+      {
+        name: "read_data_table",
+        description: "Read a Data Table: row names, column definitions, and row data.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Data table asset path" },
+          },
+          required: ["path"],
+        },
+      },
+      {
+        name: "add_data_table_row",
+        description: "Add or update a row in a Data Table. Row data is imported as struct text format.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Data table asset path" },
+            row_name: { type: "string", description: "Row name/key" },
+            row_data: { type: "string", description: "Row data as text matching struct format" },
+          },
+          required: ["path", "row_name", "row_data"],
+        },
+      },
       // Sprint 18 — Sequencer / Cinematics
       {
         name: "create_level_sequence",

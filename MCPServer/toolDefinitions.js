@@ -1693,6 +1693,62 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 13 — Widget Blueprint / UMG
+      {
+        name: "create_widget_blueprint",
+        description: "Create a new Widget Blueprint (UMG) with a default CanvasPanel root.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path (e.g. '/Game/UI')" },
+            asset_name: { type: "string", description: "Widget blueprint name" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "add_widget",
+        description: "Add a widget to a Widget Blueprint. Types: TextBlock, Button, Image, VerticalBox, HorizontalBox, Overlay, CanvasPanel, Border, Slider, CheckBox, EditableTextBox, ProgressBar, ScrollBox, SizeBox, Spacer, GridPanel.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Widget blueprint path" },
+            widget_type: { type: "string", description: "Widget type name" },
+            widget_name: { type: "string", description: "Widget name (optional, auto-generated if omitted)" },
+            parent_name: { type: "string", description: "Parent panel name (default: root)" },
+            x: { type: "number", description: "X position (CanvasPanel only)" },
+            y: { type: "number", description: "Y position (CanvasPanel only)" },
+            width: { type: "number", description: "Width (CanvasPanel only, default 200)" },
+            height: { type: "number", description: "Height (CanvasPanel only, default 50)" },
+          },
+          required: ["blueprint_path", "widget_type"],
+        },
+      },
+      {
+        name: "set_widget_property",
+        description: "Set a property on a widget in a Widget Blueprint. Common: Text (on TextBlock), Visibility, ColorAndOpacity. Uses FProperty import for generic properties.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Widget blueprint path" },
+            widget_name: { type: "string", description: "Widget name" },
+            property: { type: "string", description: "Property name (e.g. 'Text', 'Visibility')" },
+            value: { type: "string", description: "Value as text" },
+          },
+          required: ["blueprint_path", "widget_name", "property", "value"],
+        },
+      },
+      {
+        name: "read_widget_tree",
+        description: "Read the widget hierarchy of a Widget Blueprint. Returns tree structure with names, classes, visibility, and children.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Widget blueprint path" },
+          },
+          required: ["blueprint_path"],
+        },
+      },
       // Sprint 12 — Material System
       {
         name: "create_material",

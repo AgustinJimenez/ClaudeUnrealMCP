@@ -30,7 +30,8 @@ public class ClaudeUnrealMCP : ModuleRules
 			"Chooser",    // For UChooserTable migration
 			"StructUtils",  // For FInstancedStruct
 			"EditorScriptingUtilities",  // For UEditorAssetLibrary
-			"AssetTools"  // For material/asset creation factories
+			"AssetTools",  // For material/asset creation factories
+			"UMG"  // For UWidget, UWidgetTree, widget components
 		});
 	}
 }

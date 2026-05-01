@@ -123,6 +123,12 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Widget Blueprint / UMG (Sprint 13)
+	FString HandleCreateWidgetBlueprint(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddWidget(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetWidgetProperty(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadWidgetTree(const TSharedPtr<FJsonObject>& Params);
+
 	// Material System (Sprint 12)
 	FString HandleCreateMaterial(const TSharedPtr<FJsonObject>& Params);
 	FString HandleCreateMaterialInstance(const TSharedPtr<FJsonObject>& Params);

@@ -123,6 +123,13 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Material System (Sprint 12)
+	FString HandleCreateMaterial(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateMaterialInstance(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetMaterialParameter(const TSharedPtr<FJsonObject>& Params);
+	FString HandleListMaterialParameters(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAssignMaterialToActor(const TSharedPtr<FJsonObject>& Params);
+
 	// Actor & Level Management (Sprint 11)
 	FString HandleSpawnActor(const TSharedPtr<FJsonObject>& Params);
 	FString HandleDestroyActor(const TSharedPtr<FJsonObject>& Params);

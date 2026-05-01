@@ -29,7 +29,8 @@ public class ClaudeUnrealMCP : ModuleRules
 			"UMGEditor",  // For UWidgetBlueprint
 			"Chooser",    // For UChooserTable migration
 			"StructUtils",  // For FInstancedStruct
-			"EditorScriptingUtilities"  // For UEditorAssetLibrary
+			"EditorScriptingUtilities",  // For UEditorAssetLibrary
+			"AssetTools"  // For material/asset creation factories
 		});
 	}
 }

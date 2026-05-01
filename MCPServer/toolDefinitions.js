@@ -1693,6 +1693,75 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 12 — Material System
+      {
+        name: "create_material",
+        description: "Create a new empty material asset.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path (e.g. '/Game/Materials')" },
+            asset_name: { type: "string", description: "Material name" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "create_material_instance",
+        description: "Create a material instance from a parent material.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            parent_path: { type: "string", description: "Parent material path" },
+            asset_path: { type: "string", description: "Folder path for new instance" },
+            asset_name: { type: "string", description: "Instance name" },
+          },
+          required: ["parent_path", "asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "set_material_parameter",
+        description: "Set a parameter on a material instance (scalar, vector, or texture).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material instance path" },
+            param_name: { type: "string", description: "Parameter name" },
+            param_type: { type: "string", description: "scalar, vector, or texture" },
+            value: { type: "number", description: "For scalar params" },
+            r: { type: "number", description: "Red (0-1) for vector params" },
+            g: { type: "number", description: "Green (0-1) for vector params" },
+            b: { type: "number", description: "Blue (0-1) for vector params" },
+            a: { type: "number", description: "Alpha (0-1) for vector params (default 1)" },
+            texture_path: { type: "string", description: "Texture path for texture params" },
+          },
+          required: ["material_path", "param_name", "param_type"],
+        },
+      },
+      {
+        name: "list_material_parameters",
+        description: "List all parameters (scalar, vector, texture) on a material or material instance with current values.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material or material instance path" },
+          },
+          required: ["material_path"],
+        },
+      },
+      {
+        name: "assign_material_to_actor",
+        description: "Assign a material to an actor's mesh component at a given slot index.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label" },
+            material_path: { type: "string", description: "Material or material instance path" },
+            slot_index: { type: "number", description: "Material slot index (default 0)" },
+          },
+          required: ["actor_name", "material_path"],
+        },
+      },
       // Sprint 11 — Actor & Level Management
       {
         name: "spawn_actor",

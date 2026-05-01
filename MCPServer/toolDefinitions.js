@@ -1693,4 +1693,75 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 11 — Actor & Level Management
+      {
+        name: "spawn_actor",
+        description: "Spawn an actor into the current level. Supports both native classes and Blueprint classes. Wrapped in undo transaction.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            class_path: { type: "string", description: "Class path (e.g. '/Script/Engine.StaticMeshActor', '/Game/Blueprints/MyBP')" },
+            x: { type: "number", description: "X location (default 0)" },
+            y: { type: "number", description: "Y location (default 0)" },
+            z: { type: "number", description: "Z location (default 0)" },
+            pitch: { type: "number", description: "Pitch rotation (default 0)" },
+            yaw: { type: "number", description: "Yaw rotation (default 0)" },
+            roll: { type: "number", description: "Roll rotation (default 0)" },
+            label: { type: "string", description: "Optional actor label" },
+          },
+          required: ["class_path"],
+        },
+      },
+      {
+        name: "destroy_actor",
+        description: "Remove an actor from the current level by name or label. Wrapped in undo transaction.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label" },
+          },
+          required: ["actor_name"],
+        },
+      },
+      {
+        name: "duplicate_actor",
+        description: "Duplicate an existing actor in the level with an optional offset. Wrapped in undo transaction.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label to duplicate" },
+            offset_x: { type: "number", description: "X offset from original (default 0)" },
+            offset_y: { type: "number", description: "Y offset from original (default 0)" },
+            offset_z: { type: "number", description: "Z offset from original (default 0)" },
+          },
+          required: ["actor_name"],
+        },
+      },
+      {
+        name: "get_current_level",
+        description: "Get information about the currently loaded level (name, path, actor count).",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "load_level",
+        description: "Open a level in the editor. Saves dirty packages first.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            level_path: { type: "string", description: "Level asset path (e.g. '/Game/Maps/MyLevel')" },
+          },
+          required: ["level_path"],
+        },
+      },
+      {
+        name: "list_levels",
+        description: "List the persistent level and all streaming sublevels in the current world.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
 ];

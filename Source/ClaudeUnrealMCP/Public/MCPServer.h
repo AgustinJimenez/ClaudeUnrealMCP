@@ -120,8 +120,16 @@ private:
 	// Chooser Table migration (Sprint 9)
 	FString HandleMigrateChooserTable(const TSharedPtr<FJsonObject>& Params);
 
-	// Generic Python script execution
+	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
+
+	// Actor & Level Management (Sprint 11)
+	FString HandleSpawnActor(const TSharedPtr<FJsonObject>& Params);
+	FString HandleDestroyActor(const TSharedPtr<FJsonObject>& Params);
+	FString HandleDuplicateActor(const TSharedPtr<FJsonObject>& Params);
+	FString HandleGetCurrentLevel(const TSharedPtr<FJsonObject>& Params);
+	FString HandleLoadLevel(const TSharedPtr<FJsonObject>& Params);
+	FString HandleListLevels(const TSharedPtr<FJsonObject>& Params);
 
 	// Helpers
 	FString MakeResponse(bool bSuccess, const TSharedPtr<FJsonObject>& Data, const FString& Error = TEXT(""));

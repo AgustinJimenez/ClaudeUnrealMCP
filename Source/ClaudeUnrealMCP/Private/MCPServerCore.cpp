@@ -370,7 +370,13 @@ FString FMCPServer::ProcessCommand(const TSharedPtr<FJsonObject>& JsonCommand)
 		{TEXT("fix_optional_struct_pin_defaults"), &FMCPServer::HandleFixOptionalStructPinDefaults},
 		{TEXT("set_struct_field_default"), &FMCPServer::HandleSetStructFieldDefault},
 		{TEXT("migrate_chooser_table"), &FMCPServer::HandleMigrateChooserTable},
-		{TEXT("run_python"), &FMCPServer::HandleRunPython}
+		{TEXT("run_python"), &FMCPServer::HandleRunPython},
+		{TEXT("spawn_actor"), &FMCPServer::HandleSpawnActor},
+		{TEXT("destroy_actor"), &FMCPServer::HandleDestroyActor},
+		{TEXT("duplicate_actor"), &FMCPServer::HandleDuplicateActor},
+		{TEXT("get_current_level"), &FMCPServer::HandleGetCurrentLevel},
+		{TEXT("load_level"), &FMCPServer::HandleLoadLevel},
+		{TEXT("list_levels"), &FMCPServer::HandleListLevels}
 	};
 
 	if (const FCommandHandler* Handler = CommandHandlers.Find(Command))

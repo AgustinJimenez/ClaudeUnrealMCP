@@ -36,7 +36,8 @@ public class ClaudeUnrealMCP : ModuleRules
 			"BehaviorTreeEditor",  // For BT/BB factories
 			"LevelEditor",  // For viewport camera control
 			"Slate",  // For SLevelViewport
-			"SlateCore"
+			"SlateCore",
+			"MaterialEditor"  // For UMaterialEditingLibrary
 		});
 	}
 }

@@ -123,6 +123,13 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Material Graph Authoring (Sprint 17)
+	FString HandleAddMaterialExpression(const TSharedPtr<FJsonObject>& Params);
+	FString HandleConnectMaterialExpressions(const TSharedPtr<FJsonObject>& Params);
+	FString HandleDeleteMaterialExpression(const TSharedPtr<FJsonObject>& Params);
+	FString HandleRecompileMaterial(const TSharedPtr<FJsonObject>& Params);
+	FString HandleListMaterialExpressions(const TSharedPtr<FJsonObject>& Params);
+
 	// PIE + Editor Workflow (Sprint 16)
 	FString HandlePlayInEditor(const TSharedPtr<FJsonObject>& Params);
 	FString HandleExecuteConsoleCommand(const TSharedPtr<FJsonObject>& Params);

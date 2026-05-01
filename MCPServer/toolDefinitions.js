@@ -1693,6 +1693,71 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 17 — Material Graph Authoring
+      {
+        name: "add_material_expression",
+        description: "Add a material expression node to a material graph. Common types: Multiply, Add, Lerp, Constant, VectorParameter, ScalarParameter, TextureSample, TextureCoordinate, Clamp, Power, Fresnel, ConstantBiasScale.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material asset path" },
+            expression_class: { type: "string", description: "Expression type (e.g. 'Multiply', 'TextureSample')" },
+            x: { type: "number", description: "Node X position (default 0)" },
+            y: { type: "number", description: "Node Y position (default 0)" },
+            description: { type: "string", description: "Optional description label for the node" },
+          },
+          required: ["material_path", "expression_class"],
+        },
+      },
+      {
+        name: "connect_material_expressions",
+        description: "Wire two material expression nodes together. Find expressions by name, desc, or index from list_material_expressions.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material asset path" },
+            from_expression: { type: "string", description: "Source expression (name, desc, or index)" },
+            from_output: { type: "string", description: "Output pin name (empty string for default)" },
+            to_expression: { type: "string", description: "Target expression (name, desc, or index)" },
+            to_input: { type: "string", description: "Input pin name (e.g. 'A', 'B', 'BaseColor')" },
+          },
+          required: ["material_path", "from_expression", "from_output", "to_expression", "to_input"],
+        },
+      },
+      {
+        name: "delete_material_expression",
+        description: "Remove a material expression node from a material graph.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material asset path" },
+            expression: { type: "string", description: "Expression to delete (name, desc, or index)" },
+          },
+          required: ["material_path", "expression"],
+        },
+      },
+      {
+        name: "recompile_material",
+        description: "Recompile a material after graph changes and save it.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material asset path" },
+          },
+          required: ["material_path"],
+        },
+      },
+      {
+        name: "list_material_expressions",
+        description: "List all expression nodes in a material graph with their index, class, position, desc, and output pin names.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            material_path: { type: "string", description: "Material asset path" },
+          },
+          required: ["material_path"],
+        },
+      },
       // Sprint 16 — PIE + Editor Workflow
       {
         name: "play_in_editor",

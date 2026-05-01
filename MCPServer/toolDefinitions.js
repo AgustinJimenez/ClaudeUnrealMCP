@@ -1693,6 +1693,63 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 16 — PIE + Editor Workflow
+      {
+        name: "play_in_editor",
+        description: "Control Play-In-Editor sessions. Operations: start (begin PIE), stop (end PIE), status (check if playing).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "start, stop, or status (default: status)" },
+          },
+        },
+      },
+      {
+        name: "execute_console_command",
+        description: "Execute a UE console command in the editor. Common: stat fps, stat unit, ShowFlag.Collision 1, obj list, r.SetRes 1920x1080. Output not captured — use read_log with keyword filter to see results.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            command: { type: "string", description: "Console command to execute" },
+          },
+          required: ["command"],
+        },
+      },
+      {
+        name: "read_log",
+        description: "Read recent lines from the editor output log file. Supports keyword filtering.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            line_count: { type: "number", description: "Number of recent lines to return (default 50, max 5000)" },
+            keyword: { type: "string", description: "Filter lines containing this keyword (case insensitive)" },
+          },
+        },
+      },
+      {
+        name: "get_engine_version",
+        description: "Get the Unreal Engine version, branch, and build configuration.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
+        name: "set_viewport_camera",
+        description: "Get or set the editor viewport camera position and rotation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "get or set (default: get)" },
+            x: { type: "number", description: "X location" },
+            y: { type: "number", description: "Y location" },
+            z: { type: "number", description: "Z location" },
+            pitch: { type: "number", description: "Pitch rotation" },
+            yaw: { type: "number", description: "Yaw rotation" },
+            roll: { type: "number", description: "Roll rotation" },
+          },
+        },
+      },
       // Sprint 14 — Behavior Tree
       {
         name: "create_behavior_tree",

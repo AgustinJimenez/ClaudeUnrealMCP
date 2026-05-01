@@ -123,6 +123,13 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// PIE + Editor Workflow (Sprint 16)
+	FString HandlePlayInEditor(const TSharedPtr<FJsonObject>& Params);
+	FString HandleExecuteConsoleCommand(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadLog(const TSharedPtr<FJsonObject>& Params);
+	FString HandleGetEngineVersion(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetViewportCamera(const TSharedPtr<FJsonObject>& Params);
+
 	// Behavior Tree (Sprint 14)
 	FString HandleCreateBehaviorTree(const TSharedPtr<FJsonObject>& Params);
 	FString HandleCreateBlackboard(const TSharedPtr<FJsonObject>& Params);

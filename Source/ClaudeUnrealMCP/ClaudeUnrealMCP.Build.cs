@@ -33,7 +33,10 @@ public class ClaudeUnrealMCP : ModuleRules
 			"AssetTools",  // For material/asset creation factories
 			"UMG",  // For UWidget, UWidgetTree, widget components
 			"AIModule",  // For BehaviorTree, BlackboardData
-			"BehaviorTreeEditor"  // For BT/BB factories
+			"BehaviorTreeEditor",  // For BT/BB factories
+			"LevelEditor",  // For viewport camera control
+			"Slate",  // For SLevelViewport
+			"SlateCore"
 		});
 	}
 }

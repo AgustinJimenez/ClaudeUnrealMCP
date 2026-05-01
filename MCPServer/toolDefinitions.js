@@ -1693,6 +1693,67 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 21 — GameplayTags
+      {
+        name: "manage_gameplay_tags",
+        description: "Manage gameplay tags. Operations: list (with optional parent filter), add (create new tag), request (check if valid and get parents).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "list, add, or request" },
+            tag: { type: "string", description: "Tag name for add/request (e.g. 'Ability.Skill.Fireball')" },
+            parent: { type: "string", description: "For list: filter children of this parent tag" },
+            comment: { type: "string", description: "For add: dev comment" },
+          },
+          required: ["operation"],
+        },
+      },
+      // Sprint 22 — Spline Tools
+      {
+        name: "spline_ops",
+        description: "Operate on a SplineComponent attached to an actor. Operations: read (get all points), add_point (add point at xyz), clear (remove all points), set_closed (open/close loop).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label with SplineComponent" },
+            operation: { type: "string", description: "read, add_point, clear, set_closed" },
+            x: { type: "number" }, y: { type: "number" }, z: { type: "number" },
+            closed: { type: "boolean", description: "For set_closed" },
+          },
+          required: ["actor_name", "operation"],
+        },
+      },
+      // Sprint 23 — Physics & Collision
+      {
+        name: "set_physics",
+        description: "Set physics properties on an actor's primitive component: simulate_physics, gravity, mass, damping.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label" },
+            simulate_physics: { type: "boolean" },
+            enable_gravity: { type: "boolean" },
+            mass: { type: "number", description: "Mass override in kg" },
+            linear_damping: { type: "number" },
+            angular_damping: { type: "number" },
+          },
+          required: ["actor_name"],
+        },
+      },
+      {
+        name: "set_collision",
+        description: "Set collision properties on an actor: collision profile, collision enabled mode, overlap events.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label" },
+            collision_profile: { type: "string", description: "Collision preset name (e.g. 'BlockAll', 'OverlapAll', 'Pawn')" },
+            collision_enabled: { type: "string", description: "NoCollision, QueryOnly, PhysicsOnly, QueryAndPhysics" },
+            generate_overlap_events: { type: "boolean" },
+          },
+          required: ["actor_name"],
+        },
+      },
       // Sprint 19 — Niagara VFX
       {
         name: "spawn_niagara_system",

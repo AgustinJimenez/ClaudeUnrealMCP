@@ -39,6 +39,7 @@ public class ClaudeUnrealMCP : ModuleRules
 			"SlateCore",
 			"MaterialEditor",  // For UMaterialEditingLibrary
 			"Niagara",  // For UNiagaraComponent, UNiagaraSystem
+			"GameplayTags",  // For UGameplayTagsManager
 			"LevelSequence",  // For ULevelSequence
 			"MovieScene",  // For UMovieScene, tracks, sections
 			"MovieSceneTracks"  // For transform/audio/event tracks

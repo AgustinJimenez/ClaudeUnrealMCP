@@ -123,6 +123,12 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// GameplayTags + Splines + Physics (Sprint 21-23)
+	FString HandleManageGameplayTags(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSplineOps(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetPhysics(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetCollision(const TSharedPtr<FJsonObject>& Params);
+
 	// Niagara VFX (Sprint 19)
 	FString HandleSpawnNiagaraSystem(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetNiagaraParameter(const TSharedPtr<FJsonObject>& Params);

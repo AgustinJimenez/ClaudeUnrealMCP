@@ -123,6 +123,17 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Behavior Tree (Sprint 14)
+	FString HandleCreateBehaviorTree(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateBlackboard(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddBlackboardKey(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadBehaviorTree(const TSharedPtr<FJsonObject>& Params);
+
+	// Quality of Life (Sprint 15)
+	FString HandleSearchAssets(const TSharedPtr<FJsonObject>& Params);
+	FString HandleRenameAsset(const TSharedPtr<FJsonObject>& Params);
+	FString HandleDeleteAsset(const TSharedPtr<FJsonObject>& Params);
+
 	// Widget Blueprint / UMG (Sprint 13)
 	FString HandleCreateWidgetBlueprint(const TSharedPtr<FJsonObject>& Params);
 	FString HandleAddWidget(const TSharedPtr<FJsonObject>& Params);

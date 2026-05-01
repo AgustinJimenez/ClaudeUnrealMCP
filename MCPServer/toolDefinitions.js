@@ -1693,6 +1693,96 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 14 — Behavior Tree
+      {
+        name: "create_behavior_tree",
+        description: "Create a new Behavior Tree asset. Optionally link to a Blackboard.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path (e.g. '/Game/AI')" },
+            asset_name: { type: "string", description: "BT name" },
+            blackboard_path: { type: "string", description: "Optional: blackboard asset path to link" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "create_blackboard",
+        description: "Create a new Blackboard data asset for use with Behavior Trees.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "Blackboard name" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "add_blackboard_key",
+        description: "Add a key to a Blackboard asset. Types: Bool, Float, Int, String, Name, Object, Class, Enum, Vector, Rotator.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blackboard_path: { type: "string", description: "Blackboard asset path" },
+            key_name: { type: "string", description: "Key name" },
+            key_type: { type: "string", description: "Key type (Bool, Float, Int, String, Name, Object, Class, Enum, Vector, Rotator)" },
+            instance_synced: { type: "boolean", description: "Whether key is instance-synced (default false)" },
+          },
+          required: ["blackboard_path", "key_name", "key_type"],
+        },
+      },
+      {
+        name: "read_behavior_tree",
+        description: "Read a Behavior Tree's full node hierarchy including composites, tasks, decorators, services, and linked blackboard keys.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Behavior Tree asset path" },
+          },
+          required: ["path"],
+        },
+      },
+      // Sprint 15 — Quality of Life
+      {
+        name: "search_assets",
+        description: "Search for assets by name pattern. Supports class and path filtering.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Name pattern to search (* for all)" },
+            class_filter: { type: "string", description: "Optional class filter (e.g. '/Script/Engine.StaticMesh')" },
+            path_filter: { type: "string", description: "Path prefix (default '/Game')" },
+            max_results: { type: "number", description: "Max results (default 50)" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "rename_asset",
+        description: "Rename or move an asset to a new path.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            source_path: { type: "string", description: "Current asset path" },
+            dest_path: { type: "string", description: "New asset path (full path including name)" },
+          },
+          required: ["source_path", "dest_path"],
+        },
+      },
+      {
+        name: "delete_asset",
+        description: "Delete an asset. By default checks for references first and refuses if referenced.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Asset path to delete" },
+            check_references: { type: "boolean", description: "Check for references before deleting (default true)" },
+          },
+          required: ["path"],
+        },
+      },
       // Sprint 13 — Widget Blueprint / UMG
       {
         name: "create_widget_blueprint",

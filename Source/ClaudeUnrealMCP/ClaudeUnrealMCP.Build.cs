@@ -31,7 +31,9 @@ public class ClaudeUnrealMCP : ModuleRules
 			"StructUtils",  // For FInstancedStruct
 			"EditorScriptingUtilities",  // For UEditorAssetLibrary
 			"AssetTools",  // For material/asset creation factories
-			"UMG"  // For UWidget, UWidgetTree, widget components
+			"UMG",  // For UWidget, UWidgetTree, widget components
+			"AIModule",  // For BehaviorTree, BlackboardData
+			"BehaviorTreeEditor"  // For BT/BB factories
 		});
 	}
 }

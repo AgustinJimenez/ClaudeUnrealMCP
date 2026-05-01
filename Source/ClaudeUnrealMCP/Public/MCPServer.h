@@ -123,6 +123,12 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Sequencer / Cinematics (Sprint 18)
+	FString HandleCreateLevelSequence(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadLevelSequence(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddSequenceTrack(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetSequencePlayback(const TSharedPtr<FJsonObject>& Params);
+
 	// Material Graph Authoring (Sprint 17)
 	FString HandleAddMaterialExpression(const TSharedPtr<FJsonObject>& Params);
 	FString HandleConnectMaterialExpressions(const TSharedPtr<FJsonObject>& Params);

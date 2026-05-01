@@ -1693,6 +1693,58 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 18 — Sequencer / Cinematics
+      {
+        name: "create_level_sequence",
+        description: "Create a new Level Sequence (cinematic) asset with optional playback range.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path (e.g. '/Game/Cinematics')" },
+            asset_name: { type: "string", description: "Sequence name" },
+            start_time: { type: "number", description: "Start time in seconds (default 0)" },
+            end_time: { type: "number", description: "End time in seconds (default 5)" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "read_level_sequence",
+        description: "Read a Level Sequence structure: playback range, master tracks, object bindings with their tracks.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Level Sequence asset path" },
+          },
+          required: ["path"],
+        },
+      },
+      {
+        name: "add_sequence_track",
+        description: "Add a track to a Level Sequence. Types: Transform, SkeletalAnimation, Audio, Event, Fade, CameraCut, Float, Bool. Can be master track or bound to an object via binding_guid.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sequence_path: { type: "string", description: "Level Sequence asset path" },
+            track_type: { type: "string", description: "Track type (Transform, SkeletalAnimation, Audio, Event, Fade, CameraCut, Float, Bool)" },
+            binding_guid: { type: "string", description: "Optional: bind track to object (GUID from read_level_sequence)" },
+          },
+          required: ["sequence_path", "track_type"],
+        },
+      },
+      {
+        name: "set_sequence_playback",
+        description: "Set the playback range of a Level Sequence in seconds.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            sequence_path: { type: "string", description: "Level Sequence asset path" },
+            start_time: { type: "number", description: "Start time in seconds" },
+            end_time: { type: "number", description: "End time in seconds" },
+          },
+          required: ["sequence_path", "start_time", "end_time"],
+        },
+      },
       // Sprint 17 — Material Graph Authoring
       {
         name: "add_material_expression",

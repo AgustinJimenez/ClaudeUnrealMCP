@@ -37,7 +37,10 @@ public class ClaudeUnrealMCP : ModuleRules
 			"LevelEditor",  // For viewport camera control
 			"Slate",  // For SLevelViewport
 			"SlateCore",
-			"MaterialEditor"  // For UMaterialEditingLibrary
+			"MaterialEditor",  // For UMaterialEditingLibrary
+			"LevelSequence",  // For ULevelSequence
+			"MovieScene",  // For UMovieScene, tracks, sections
+			"MovieSceneTracks"  // For transform/audio/event tracks
 		});
 	}
 }

@@ -1,5 +1,7 @@
 # ClaudeUnrealMCP
 
+> **WARNING: This project is in active development and is not production-ready.** APIs, commands, and behavior may change without notice. Use at your own risk.
+
 An Unreal Engine 5 editor plugin that provides [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) integration for AI coding assistants like [Claude Code](https://claude.ai/code). Gives Claude Code full read/write access to the UE5 editor via a TCP server.
 
 ## Features

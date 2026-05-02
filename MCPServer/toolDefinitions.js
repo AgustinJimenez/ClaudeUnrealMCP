@@ -1693,6 +1693,83 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 27 — Animation Authoring
+      {
+        name: "create_montage",
+        description: "Create a new AnimMontage asset from a skeleton.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "Montage name" },
+            skeleton_path: { type: "string", description: "Path to USkeleton asset" },
+          },
+          required: ["asset_path", "asset_name", "skeleton_path"],
+        },
+      },
+      {
+        name: "add_montage_section",
+        description: "Add a composite section to an AnimMontage at a specific time.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            montage_path: { type: "string", description: "Montage asset path" },
+            section_name: { type: "string", description: "Section name" },
+            start_time: { type: "number", description: "Section start time in seconds (default 0)" },
+          },
+          required: ["montage_path", "section_name"],
+        },
+      },
+      {
+        name: "read_montage",
+        description: "Read an AnimMontage structure: sections, slot tracks, notifies, length.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Montage asset path" },
+          },
+          required: ["path"],
+        },
+      },
+      {
+        name: "create_blend_space",
+        description: "Create a new BlendSpace (2D) or BlendSpace1D asset.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "BlendSpace name" },
+            skeleton_path: { type: "string", description: "Path to USkeleton asset" },
+            is_1d: { type: "boolean", description: "Create 1D blend space (default: false = 2D)" },
+          },
+          required: ["asset_path", "asset_name", "skeleton_path"],
+        },
+      },
+      {
+        name: "add_blend_space_sample",
+        description: "Add an animation sample point to a BlendSpace at specified coordinates.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blend_space_path: { type: "string", description: "BlendSpace asset path" },
+            animation_path: { type: "string", description: "AnimSequence asset path to add as sample" },
+            value_x: { type: "number", description: "X axis value" },
+            value_y: { type: "number", description: "Y axis value (2D only)" },
+          },
+          required: ["blend_space_path", "animation_path"],
+        },
+      },
+      {
+        name: "read_anim_sequence",
+        description: "Read AnimSequence/AnimMontage info: length, skeleton, notifies, frame count, rate scale.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Animation asset path" },
+          },
+          required: ["path"],
+        },
+      },
       // Sprint 24 — State Trees
       {
         name: "create_state_tree",

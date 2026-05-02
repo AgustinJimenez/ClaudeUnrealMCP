@@ -123,6 +123,14 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// Animation Authoring (Sprint 27)
+	FString HandleCreateMontage(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddMontageSection(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadMontage(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateBlendSpace(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddBlendSpaceSample(const TSharedPtr<FJsonObject>& Params);
+	FString HandleReadAnimSequence(const TSharedPtr<FJsonObject>& Params);
+
 	// State Trees + Audio + Landscape (Sprint 24-26)
 	FString HandleCreateStateTree(const TSharedPtr<FJsonObject>& Params);
 	FString HandleCreateSoundCue(const TSharedPtr<FJsonObject>& Params);

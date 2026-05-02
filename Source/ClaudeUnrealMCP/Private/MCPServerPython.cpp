@@ -213,5 +213,49 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 		return MakeResponse(true, Data);
 	}
 
+	else if (Op == TEXT("set_subobject_property"))
+	{
+		FString Path, SubObjPath, PropName, ValueText;
+		if (!Params->TryGetStringField(TEXT("path"), Path) ||
+			!Params->TryGetStringField(TEXT("subobject"), SubObjPath) ||
+			!Params->TryGetStringField(TEXT("property"), PropName) ||
+			!Params->TryGetStringField(TEXT("value"), ValueText))
+		{
+			return MakeError(TEXT("set_subobject_property requires path, subobject, property, value"));
+		}
+		UObject* Asset = UEditorAssetLibrary::LoadAsset(Path);
+		if (!Asset)
+			return MakeError(FString::Printf(TEXT("Asset not found: %s"), *Path));
+
+		UObject* Current = Asset;
+		TArray<FString> PathParts;
+		SubObjPath.ParseIntoArray(PathParts, TEXT("."));
+		for (const FString& Part : PathParts)
+		{
+			FObjectProperty* ObjProp = FindFProperty<FObjectProperty>(Current->GetClass(), *Part);
+			if (!ObjProp)
+				return MakeError(FString::Printf(TEXT("Property '%s' not found on %s"), *Part, *Current->GetClass()->GetName()));
+			UObject* Next = ObjProp->GetObjectPropertyValue_InContainer(Current);
+			if (!Next)
+				return MakeError(FString::Printf(TEXT("Sub-object '%s' is null"), *Part));
+			Current = Next;
+		}
+
+		FProperty* Prop = FindFProperty<FProperty>(Current->GetClass(), *PropName);
+		if (!Prop)
+			return MakeError(FString::Printf(TEXT("Property '%s' not found on %s"), *PropName, *Current->GetClass()->GetName()));
+
+		void* ValPtr = Prop->ContainerPtrToValuePtr<void>(Current);
+		const TCHAR* Result = Prop->ImportText_Direct(*ValueText, ValPtr, Current, PPF_None);
+		if (!Result)
+			return MakeError(FString::Printf(TEXT("Failed to import value for %s"), *PropName));
+
+		Asset->Modify();
+		Current->Modify();
+		UEditorAssetLibrary::SaveAsset(Path, false);
+		Data->SetBoolField(TEXT("set"), true);
+		return MakeResponse(true, Data);
+	}
+
 	return MakeError(FString::Printf(TEXT("Unknown op: %s"), *Op));
 }

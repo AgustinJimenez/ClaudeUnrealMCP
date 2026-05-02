@@ -77,6 +77,26 @@ FString FMCPServer::HandleExecuteConsoleCommand(const TSharedPtr<FJsonObject>& P
 		return MakeError(TEXT("No world context available"));
 	}
 
+	// Special: "setrot <pitch> <yaw>" directly sets PlayerController control rotation in PIE
+	if (Command.StartsWith(TEXT("setrot ")))
+	{
+		TArray<FString> Parts;
+		Command.ParseIntoArrayWS(Parts);
+		if (Parts.Num() >= 3 && World->GetFirstPlayerController())
+		{
+			float Pitch = FCString::Atof(*Parts[1]);
+			float Yaw = FCString::Atof(*Parts[2]);
+			World->GetFirstPlayerController()->SetControlRotation(FRotator(Pitch, Yaw, 0));
+
+			TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+			Data->SetStringField(TEXT("command"), Command);
+			Data->SetNumberField(TEXT("pitch"), Pitch);
+			Data->SetNumberField(TEXT("yaw"), Yaw);
+			return MakeResponse(true, Data);
+		}
+		return MakeError(TEXT("setrot requires: setrot <pitch> <yaw>. PIE must be running."));
+	}
+
 	// Execute the console command
 	GEngine->Exec(World, *Command);
 

@@ -40,6 +40,10 @@ public class ClaudeUnrealMCP : ModuleRules
 			"MaterialEditor",  // For UMaterialEditingLibrary
 			"Niagara",  // For UNiagaraComponent, UNiagaraSystem
 			"GameplayTags",  // For UGameplayTagsManager
+			"StateTreeModule",  // For UStateTree
+			"StateTreeEditorModule",  // For UStateTreeFactory
+			"AudioEditor",  // For SoundCue factory
+			"Landscape",  // For ALandscapeProxy
 			"LevelSequence",  // For ULevelSequence
 			"MovieScene",  // For UMovieScene, tracks, sections
 			"MovieSceneTracks"  // For transform/audio/event tracks

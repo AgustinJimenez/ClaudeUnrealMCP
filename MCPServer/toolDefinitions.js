@@ -1693,6 +1693,55 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 24 — State Trees
+      {
+        name: "create_state_tree",
+        description: "Create a new StateTree asset.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "StateTree name" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      // Sprint 25 — Audio
+      {
+        name: "create_sound_cue",
+        description: "Create a new SoundCue asset.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "SoundCue name" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "create_sound_attenuation",
+        description: "Create a SoundAttenuation settings asset with optional inner radius and falloff distance.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Folder path" },
+            asset_name: { type: "string", description: "Attenuation name" },
+            inner_radius: { type: "number", description: "Inner radius (default engine value)" },
+            falloff_distance: { type: "number", description: "Falloff distance (default engine value)" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      // Sprint 26 — Landscape
+      {
+        name: "get_landscape_info",
+        description: "Get information about all landscapes in the current level: name, bounds, component count, material.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
       // Sprint 21 — GameplayTags
       {
         name: "manage_gameplay_tags",

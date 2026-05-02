@@ -123,6 +123,12 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// State Trees + Audio + Landscape (Sprint 24-26)
+	FString HandleCreateStateTree(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateSoundCue(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateSoundAttenuation(const TSharedPtr<FJsonObject>& Params);
+	FString HandleGetLandscapeInfo(const TSharedPtr<FJsonObject>& Params);
+
 	// GameplayTags + Splines + Physics (Sprint 21-23)
 	FString HandleManageGameplayTags(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSplineOps(const TSharedPtr<FJsonObject>& Params);

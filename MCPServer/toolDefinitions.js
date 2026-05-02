@@ -1693,6 +1693,85 @@ export const MCP_TOOL_DEFINITIONS = [
           required: ["op"],
         },
       },
+      // Sprint 28 — PCG
+      {
+        name: "pcg_ops",
+        description: "Procedural Content Generation operations. list_components: find all PCG components in level. execute: run PCG generation on actor.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "list_components or execute" },
+            actor_name: { type: "string", description: "For execute: actor name with PCG component" },
+          },
+          required: ["operation"],
+        },
+      },
+      // Sprint 29 — GAS
+      {
+        name: "create_gameplay_ability",
+        description: "Create a GameplayAbility Blueprint. Requires GameplayAbilities plugin.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string" }, asset_name: { type: "string" },
+            parent_class: { type: "string", description: "Parent class (default: GameplayAbility)" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      {
+        name: "create_gameplay_effect",
+        description: "Create a GameplayEffect Blueprint. Requires GameplayAbilities plugin.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string" }, asset_name: { type: "string" },
+          },
+          required: ["asset_path", "asset_name"],
+        },
+      },
+      // Sprint 30 — Networking
+      {
+        name: "set_replication",
+        description: "Configure actor replication settings (replicate, replicate_movement).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor name or label" },
+            replicate: { type: "boolean", description: "Enable replication" },
+            replicate_movement: { type: "boolean", description: "Replicate movement" },
+          },
+          required: ["actor_name"],
+        },
+      },
+      // Sprint 31 — Volumes + Procedural Mesh
+      {
+        name: "create_volume",
+        description: "Create a volume actor in the level. Types: Trigger, Blocking, Audio, NavMesh.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            volume_type: { type: "string", description: "Trigger, Blocking, Audio, or NavMesh" },
+            x: { type: "number" }, y: { type: "number" }, z: { type: "number" },
+            label: { type: "string" },
+          },
+          required: ["volume_type"],
+        },
+      },
+      {
+        name: "create_procedural_mesh",
+        description: "Add a ProceduralMeshComponent to an actor and optionally create geometry from vertices/triangles. Vertices format: 'x1,y1,z1;x2,y2,z2;...' Triangles format: '0,1,2;3,4,5;...'",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor to add mesh to" },
+            vertices: { type: "string", description: "Vertices as 'x,y,z;x,y,z;...'" },
+            triangles: { type: "string", description: "Triangle indices as '0,1,2;3,4,5;...'" },
+            section: { type: "number", description: "Mesh section index (default 0)" },
+          },
+          required: ["actor_name"],
+        },
+      },
       // Sprint 27 — Animation Authoring
       {
         name: "create_montage",

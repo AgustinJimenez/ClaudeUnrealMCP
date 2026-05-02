@@ -123,6 +123,14 @@ private:
 	// Generic asset ops (Sprint 10)
 	FString HandleRunPython(const TSharedPtr<FJsonObject>& Params);
 
+	// PCG, GAS, Networking, Volumes (Sprint 28-31)
+	FString HandlePCGOps(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateGameplayAbility(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateGameplayEffect(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetReplication(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateVolume(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateProceduralMesh(const TSharedPtr<FJsonObject>& Params);
+
 	// Animation Authoring (Sprint 27)
 	FString HandleCreateMontage(const TSharedPtr<FJsonObject>& Params);
 	FString HandleAddMontageSection(const TSharedPtr<FJsonObject>& Params);

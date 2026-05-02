@@ -44,6 +44,8 @@ public class ClaudeUnrealMCP : ModuleRules
 			"StateTreeEditorModule",  // For UStateTreeFactory
 			"AudioEditor",  // For SoundCue factory
 			"Landscape",  // For ALandscapeProxy
+			"ProceduralMeshComponent",  // For UProceduralMeshComponent
+			"NavigationSystem",  // For ANavMeshBoundsVolume
 			"LevelSequence",  // For ULevelSequence
 			"MovieScene",  // For UMovieScene, tracks, sections
 			"MovieSceneTracks"  // For transform/audio/event tracks

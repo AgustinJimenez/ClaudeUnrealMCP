@@ -289,3 +289,55 @@ FString FMCPServer::HandleListLevels(const TSharedPtr<FJsonObject>& Params)
 
 	return MakeResponse(true, Data);
 }
+
+FString FMCPServer::HandleMoveActor(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid() || !Params->HasField(TEXT("actor_name")))
+		return MakeError(TEXT("actor_name required"));
+
+	const FString ActorName = Params->GetStringField(TEXT("actor_name"));
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!World) return MakeError(TEXT("No world available"));
+
+	AActor* FoundActor = nullptr;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if ((*It)->GetName() == ActorName || (*It)->GetActorLabel() == ActorName)
+		{
+			FoundActor = *It;
+			break;
+		}
+	}
+	if (!FoundActor)
+		return MakeError(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+
+	FScopedTransaction Transaction(FText::FromString(TEXT("MCP: Move Actor")));
+	FoundActor->Modify();
+
+	FVector NewLoc = FoundActor->GetActorLocation();
+	FRotator NewRot = FoundActor->GetActorRotation();
+	FVector NewScale = FoundActor->GetActorScale3D();
+
+	double V;
+	if (Params->TryGetNumberField(TEXT("x"), V)) NewLoc.X = V;
+	if (Params->TryGetNumberField(TEXT("y"), V)) NewLoc.Y = V;
+	if (Params->TryGetNumberField(TEXT("z"), V)) NewLoc.Z = V;
+	if (Params->TryGetNumberField(TEXT("pitch"), V)) NewRot.Pitch = V;
+	if (Params->TryGetNumberField(TEXT("yaw"), V)) NewRot.Yaw = V;
+	if (Params->TryGetNumberField(TEXT("roll"), V)) NewRot.Roll = V;
+	if (Params->TryGetNumberField(TEXT("scale_x"), V)) NewScale.X = V;
+	if (Params->TryGetNumberField(TEXT("scale_y"), V)) NewScale.Y = V;
+	if (Params->TryGetNumberField(TEXT("scale_z"), V)) NewScale.Z = V;
+
+	FoundActor->SetActorLocation(NewLoc);
+	FoundActor->SetActorRotation(NewRot);
+	FoundActor->SetActorScale3D(NewScale);
+	FoundActor->MarkPackageDirty();
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("actor"), FoundActor->GetActorLabel());
+	Data->SetStringField(TEXT("location"), FString::Printf(TEXT("(%.1f, %.1f, %.1f)"), NewLoc.X, NewLoc.Y, NewLoc.Z));
+	Data->SetStringField(TEXT("rotation"), FString::Printf(TEXT("(P=%.1f,Y=%.1f,R=%.1f)"), NewRot.Pitch, NewRot.Yaw, NewRot.Roll));
+	Data->SetStringField(TEXT("scale"), FString::Printf(TEXT("(%.2f, %.2f, %.2f)"), NewScale.X, NewScale.Y, NewScale.Z));
+	return MakeResponse(true, Data);
+}

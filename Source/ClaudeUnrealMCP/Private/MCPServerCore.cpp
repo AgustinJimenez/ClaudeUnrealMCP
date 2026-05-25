@@ -432,6 +432,7 @@ FString FMCPServer::ProcessCommand(const TSharedPtr<FJsonObject>& JsonCommand)
 		{TEXT("assign_material_to_actor"), &FMCPServer::HandleAssignMaterialToActor},
 		{TEXT("spawn_actor"), &FMCPServer::HandleSpawnActor},
 		{TEXT("destroy_actor"), &FMCPServer::HandleDestroyActor},
+		{TEXT("move_actor"), &FMCPServer::HandleMoveActor},
 		{TEXT("duplicate_actor"), &FMCPServer::HandleDuplicateActor},
 		{TEXT("get_current_level"), &FMCPServer::HandleGetCurrentLevel},
 		{TEXT("load_level"), &FMCPServer::HandleLoadLevel},

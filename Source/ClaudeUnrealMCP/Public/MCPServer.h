@@ -138,6 +138,8 @@ private:
 	FString HandleCreateBlendSpace(const TSharedPtr<FJsonObject>& Params);
 	FString HandleAddBlendSpaceSample(const TSharedPtr<FJsonObject>& Params);
 	FString HandleReadAnimSequence(const TSharedPtr<FJsonObject>& Params);
+	FString HandleCreateAnimBlueprint(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Params);
 
 	// State Trees + Audio + Landscape (Sprint 24-26)
 	FString HandleCreateStateTree(const TSharedPtr<FJsonObject>& Params);
@@ -180,6 +182,7 @@ private:
 	FString HandleReadLog(const TSharedPtr<FJsonObject>& Params);
 	FString HandleGetEngineVersion(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetViewportCamera(const TSharedPtr<FJsonObject>& Params);
+	FString HandleOpenAsset(const TSharedPtr<FJsonObject>& Params);
 
 	// Behavior Tree (Sprint 14)
 	FString HandleCreateBehaviorTree(const TSharedPtr<FJsonObject>& Params);

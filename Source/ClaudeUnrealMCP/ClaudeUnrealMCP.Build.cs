@@ -48,7 +48,9 @@ public class ClaudeUnrealMCP : ModuleRules
 			"NavigationSystem",  // For ANavMeshBoundsVolume
 			"LevelSequence",  // For ULevelSequence
 			"MovieScene",  // For UMovieScene, tracks, sections
-			"MovieSceneTracks"  // For transform/audio/event tracks
+			"MovieSceneTracks",  // For transform/audio/event tracks
+			"AnimGraph",  // For UAnimGraphNode_ModifyBone, AnimGraph editor nodes
+			"AnimGraphRuntime"  // For FAnimNode_ModifyBone runtime structs
 		});
 	}
 }

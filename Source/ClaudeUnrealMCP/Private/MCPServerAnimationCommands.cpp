@@ -20,6 +20,9 @@
 #include "AnimGraphNode_ModifyBone.h"
 #include "AnimGraphNode_Root.h"
 #include "AnimGraphNode_LocalRefPose.h"
+#include "AnimGraphNode_LinkedInputPose.h"
+#include "AnimGraphNode_LocalToComponentSpace.h"
+#include "AnimGraphNode_ComponentToLocalSpace.h"
 #include "AnimationGraphSchema.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -321,9 +324,9 @@ FString FMCPServer::HandleCreateAnimBlueprint(const TSharedPtr<FJsonObject>& Par
 	return MakeResponse(true, Data);
 }
 
-// Creates a Post Process Anim Blueprint with a ModifyBone node on spine_01
-// driven by a FRotator variable 'FP_SpineRotation'. Assign this ABP as the
-// mesh's post-process AnimBlueprint and write FP_SpineRotation from C++ each tick.
+// Creates a Post Process Anim Blueprint with ModifyBone nodes for spine and head.
+// Assign this ABP to the mesh and update its FAnimNode_ModifyBone rotations from
+// runtime code. Direct node updates avoid exposed-pin evaluation overwriting them.
 FString FMCPServer::HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Params)
 {
 	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
@@ -339,12 +342,16 @@ FString FMCPServer::HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Pa
 	FString BoneName = TEXT("spine_01");
 	Params->TryGetStringField(TEXT("bone_name"), BoneName);
 
-	FString VarName = TEXT("FP_SpineRotation");
-	Params->TryGetStringField(TEXT("variable_name"), VarName);
-
 	USkeleton* Skeleton = LoadObject<USkeleton>(nullptr, *SkeletonPath);
 	if (!Skeleton)
 		return MakeError(FString::Printf(TEXT("Skeleton not found: %s"), *SkeletonPath));
+
+	// ------ 0. Delete existing asset if present (so we can recreate cleanly) ------
+	FString FullAssetPath = AssetPath / AssetName;
+	if (UEditorAssetLibrary::DoesAssetExist(FullAssetPath))
+	{
+		UEditorAssetLibrary::DeleteAsset(FullAssetPath);
+	}
 
 	// ------ 1. Create the AnimBlueprint ------
 	IAssetTools& AssetTools = FModuleManager::LoadModuleChecked<FAssetToolsModule>("AssetTools").Get();
@@ -358,13 +365,7 @@ FString FMCPServer::HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Pa
 	if (!ABP)
 		return MakeError(TEXT("Failed to create AnimBlueprint"));
 
-	// ------ 2. Add FRotator variable ------
-	FEdGraphPinType RotPinType;
-	RotPinType.PinCategory = UEdGraphSchema_K2::PC_Struct;
-	RotPinType.PinSubCategoryObject = TBaseStructure<FRotator>::Get();
-	FBlueprintEditorUtils::AddMemberVariable(ABP, FName(*VarName), RotPinType);
-
-	// ------ 3. Find the AnimGraph ------
+	// ------ 2. Find the AnimGraph ------
 	UEdGraph* AnimGraph = nullptr;
 	for (UEdGraph* Graph : ABP->FunctionGraphs)
 	{
@@ -390,58 +391,74 @@ FString FMCPServer::HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Pa
 	if (!RootNode)
 		return MakeError(TEXT("AnimGraphNode_Root not found"));
 
-	// ------ 5. Create ModifyBone node ------
-	UAnimGraphNode_ModifyBone* ModifyNode = NewObject<UAnimGraphNode_ModifyBone>(AnimGraph);
-	ModifyNode->Node.BoneToModify.BoneName = FName(*BoneName);
-	ModifyNode->Node.RotationMode = EBoneModificationMode::BMM_Additive;
-	ModifyNode->Node.RotationSpace = EBoneControlSpace::BCS_ComponentSpace;
-	ModifyNode->Node.TranslationMode = EBoneModificationMode::BMM_Ignore;
-	ModifyNode->Node.ScaleMode = EBoneModificationMode::BMM_Ignore;
+	// ------ 4.5. Create LinkedInputPose node (provides parent ABP's animated pose) ------
+	// This is the correct way to get the parent ABP's output in a post-process ABP.
+	// Without this, ModifyBone.ComponentPose is unconnected → reference pose → T-pose.
+	UAnimGraphNode_LinkedInputPose* LinkedInputPoseNode = NewObject<UAnimGraphNode_LinkedInputPose>(AnimGraph);
+	LinkedInputPoseNode->CreateNewGuid();
+	AnimGraph->AddNode(LinkedInputPoseNode, false);
+	LinkedInputPoseNode->NodePosX = RootNode->NodePosX - 700;
+	LinkedInputPoseNode->NodePosY = RootNode->NodePosY;
+	LinkedInputPoseNode->AllocateDefaultPins();
 
-	// Expose the Rotation property as a pin so it can receive variable input
+	// ------ 5. Create ModifyBone node for spine (BoneName param, typically spine_01) ------
+	auto MakeModifyBoneNode = [&](const FString& Bone, int32 PosXOffset) -> UAnimGraphNode_ModifyBone*
 	{
-		FOptionalPinFromProperty RotPin;
-		RotPin.PropertyName = FName("Rotation");
-		RotPin.bShowPin = true;
-		RotPin.bCanToggleVisibility = true;
-		RotPin.bIsMarkedForAdvancedDisplay = false;
-		ModifyNode->ShowPinForProperties.Add(RotPin);
-	}
+		UAnimGraphNode_ModifyBone* N = NewObject<UAnimGraphNode_ModifyBone>(AnimGraph);
+		N->CreateNewGuid();
+		N->Node.BoneToModify.BoneName = FName(*Bone);
+		N->Node.RotationMode = EBoneModificationMode::BMM_Additive;
+		N->Node.RotationSpace = EBoneControlSpace::BCS_WorldSpace; // World space: Pitch = forward tilt
+		N->Node.TranslationMode = EBoneModificationMode::BMM_Ignore;
+		N->Node.ScaleMode = EBoneModificationMode::BMM_Ignore;
+		N->Node.Alpha = 1.0f;
+		AnimGraph->AddNode(N, false);
+		N->NodePosX = RootNode->NodePosX + PosXOffset;
+		N->NodePosY = RootNode->NodePosY;
+		N->AllocateDefaultPins();
+		return N;
+	};
 
-	AnimGraph->AddNode(ModifyNode, false);
-	ModifyNode->NodePosX = RootNode->NodePosX - 350;
-	ModifyNode->NodePosY = RootNode->NodePosY;
-	ModifyNode->AllocateDefaultPins();
+	UAnimGraphNode_ModifyBone* SpineNode = MakeModifyBoneNode(BoneName, -500);  // spine_01
+	UAnimGraphNode_ModifyBone* HeadNode  = MakeModifyBoneNode(TEXT("head"),  -300);  // head
 
-	// ------ 6. Create variable getter for FP_SpineRotation ------
-	UK2Node_VariableGet* VarGet = NewObject<UK2Node_VariableGet>(AnimGraph);
-	VarGet->VariableReference.SetSelfMember(FName(*VarName));
-	AnimGraph->AddNode(VarGet, false);
-	VarGet->NodePosX = ModifyNode->NodePosX - 250;
-	VarGet->NodePosY = ModifyNode->NodePosY + 80;
-	VarGet->AllocateDefaultPins();
+	// ------ 6. LocalToComponentSpace: LinkedInputPose[local] → L2CS → SpineNode[component] ------
+	UAnimGraphNode_LocalToComponentSpace* LocalToCSNode = NewObject<UAnimGraphNode_LocalToComponentSpace>(AnimGraph);
+	LocalToCSNode->CreateNewGuid();
+	AnimGraph->AddNode(LocalToCSNode, false);
+	LocalToCSNode->NodePosX = RootNode->NodePosX - 700;
+	LocalToCSNode->NodePosY = RootNode->NodePosY;
+	LocalToCSNode->AllocateDefaultPins();
 
-	// ------ 7. Wire: VarGet.ReturnValue -> ModifyBone.Rotation ------
-	UEdGraphPin* VarOutPin = VarGet->FindPin(FName(*VarName));
-	if (!VarOutPin)
-		VarOutPin = VarGet->FindPin(TEXT("ReturnValue"));
+	UEdGraphPin* LinkedPoseOutPin   = LinkedInputPoseNode->FindPin(TEXT("Pose"), EGPD_Output);
+	UEdGraphPin* LocalToCSInputPin  = LocalToCSNode->FindPin(TEXT("LocalPose"));
+	UEdGraphPin* LocalToCSOutputPin = LocalToCSNode->FindPin(TEXT("ComponentPose"));
+	UEdGraphPin* SpineCompPosePin   = SpineNode->FindPin(TEXT("ComponentPose"));
 
-	UEdGraphPin* RotPin = ModifyNode->FindPin(TEXT("Rotation"));
+	bool bLinkedPoseConnected = false;
+	if (LinkedPoseOutPin && LocalToCSInputPin)  { LinkedPoseOutPin->MakeLinkTo(LocalToCSInputPin);  bLinkedPoseConnected = true; }
+	if (LocalToCSOutputPin && SpineCompPosePin) { LocalToCSOutputPin->MakeLinkTo(SpineCompPosePin); }
 
-	if (VarOutPin && RotPin)
-	{
-		VarOutPin->MakeLinkTo(RotPin);
-	}
+	// Chain: SpineNode.Pose → HeadNode.ComponentPose
+	UEdGraphPin* SpineOutPin      = SpineNode->FindPin(TEXT("Pose"));
+	UEdGraphPin* HeadCompPosePin  = HeadNode->FindPin(TEXT("ComponentPose"));
+	if (SpineOutPin && HeadCompPosePin) { SpineOutPin->MakeLinkTo(HeadCompPosePin); }
 
-	// ------ 8. Wire: ModifyBone.Pose -> Root.Result ------
-	// Root node's input is "Result", ModifyBone output is "Pose"
-	UEdGraphPin* RootInputPin = RootNode->FindPin(TEXT("Result"));
-	UEdGraphPin* ModifyOutputPin = ModifyNode->FindPin(TEXT("Pose"));
+	// ------ 7. ComponentToLocalSpace: HeadNode[component] → CS2L → Root[local] ------
+	UAnimGraphNode_ComponentToLocalSpace* CSToLocalNode = NewObject<UAnimGraphNode_ComponentToLocalSpace>(AnimGraph);
+	CSToLocalNode->CreateNewGuid();
+	AnimGraph->AddNode(CSToLocalNode, false);
+	CSToLocalNode->NodePosX = RootNode->NodePosX - 100;
+	CSToLocalNode->NodePosY = RootNode->NodePosY;
+	CSToLocalNode->AllocateDefaultPins();
 
-	if (RootInputPin && ModifyOutputPin)
-	{
-		ModifyOutputPin->MakeLinkTo(RootInputPin);
-	}
+	UEdGraphPin* HeadOutPin         = HeadNode->FindPin(TEXT("Pose"));
+	UEdGraphPin* CSToLocalInputPin  = CSToLocalNode->FindPin(TEXT("ComponentPose"));
+	UEdGraphPin* CSToLocalOutputPin = CSToLocalNode->FindPin(TEXT("Pose"), EGPD_Output);
+	UEdGraphPin* RootInputPin       = RootNode->FindPin(TEXT("Result"));
+
+	if (HeadOutPin && CSToLocalInputPin)    { HeadOutPin->MakeLinkTo(CSToLocalInputPin);    }
+	if (CSToLocalOutputPin && RootInputPin) { CSToLocalOutputPin->MakeLinkTo(RootInputPin); }
 
 	// ------ 9. Compile and save ------
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(ABP);
@@ -450,9 +467,9 @@ FString FMCPServer::HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Pa
 
 	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
 	Data->SetStringField(TEXT("path"), ABP->GetPathName());
-	Data->SetStringField(TEXT("variable"), VarName);
-	Data->SetStringField(TEXT("bone"), BoneName);
-	Data->SetBoolField(TEXT("var_pin_linked"), VarOutPin != nullptr && RotPin != nullptr);
-	Data->SetBoolField(TEXT("pose_pin_linked"), RootInputPin != nullptr && ModifyOutputPin != nullptr);
+	Data->SetStringField(TEXT("spine_bone"), BoneName);
+	Data->SetBoolField(TEXT("linked_pose_connected"), bLinkedPoseConnected);
+	Data->SetBoolField(TEXT("spine_chain_ok"), LocalToCSOutputPin != nullptr && SpineCompPosePin != nullptr && SpineOutPin != nullptr && HeadCompPosePin != nullptr);
+	Data->SetBoolField(TEXT("head_to_root_ok"), HeadOutPin != nullptr && CSToLocalInputPin != nullptr && CSToLocalOutputPin != nullptr && RootInputPin != nullptr);
 	return MakeResponse(true, Data);
 }

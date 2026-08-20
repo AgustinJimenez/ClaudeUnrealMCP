@@ -26,7 +26,7 @@
 #include "K2Node_FunctionResult.h"
 #include "K2Node_SetFieldsInStruct.h"
 #include "EdGraphSchema_K2.h"
-#include "Engine/UserDefinedStruct.h"
+#include "StructUtils/UserDefinedStruct.h"
 #include "Engine/UserDefinedEnum.h"
 #include "Engine/TimelineTemplate.h"
 #include "UnrealEdGlobals.h"

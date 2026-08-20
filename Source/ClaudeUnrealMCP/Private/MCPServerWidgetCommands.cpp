@@ -1,4 +1,5 @@
 #include "MCPServer.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
 #include "AssetToolsModule.h"

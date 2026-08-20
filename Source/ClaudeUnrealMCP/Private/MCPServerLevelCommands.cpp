@@ -1,4 +1,5 @@
 #include "MCPServer.h"
+#include "EngineUtils.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
 #include "Engine/World.h"

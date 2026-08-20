@@ -2,7 +2,7 @@
 #include "Engine/Blueprint.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraphSchema_K2.h"
-#include "Engine/UserDefinedStruct.h"
+#include "StructUtils/UserDefinedStruct.h"
 #include "K2Node_SetFieldsInStruct.h"
 #include "K2Node_BreakStruct.h"
 #include "K2Node_MakeStruct.h"

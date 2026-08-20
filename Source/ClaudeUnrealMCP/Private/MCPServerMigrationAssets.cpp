@@ -36,7 +36,7 @@
 #include "K2Node_Select.h"
 #include "K2Node_Message.h"
 #include "EdGraphSchema_K2.h"
-#include "Engine/UserDefinedStruct.h"
+#include "StructUtils/UserDefinedStruct.h"
 #include "Engine/UserDefinedEnum.h"
 #include "Engine/TimelineTemplate.h"
 #include "UnrealEdGlobals.h"
@@ -323,7 +323,7 @@ FString FMCPServer::HandleMigrateChooserTable(const TSharedPtr<FJsonObject>& Par
 	{
 		for (const auto& Pair : (*StructMapPtr)->Values)
 		{
-			FString OldStructName = Pair.Key;
+			FString OldStructName = FString(Pair.Key);
 			FString NewStructPath;
 			if (!Pair.Value.IsValid() || !Pair.Value->TryGetString(NewStructPath)) continue;
 
@@ -407,7 +407,7 @@ FString FMCPServer::HandleMigrateChooserTable(const TSharedPtr<FJsonObject>& Par
 	TMap<FName, FName> NameMap;
 	for (const auto& Pair : FieldNameMap->Values)
 	{
-		FString OldName = Pair.Key;
+		FString OldName = FString(Pair.Key);
 		FString NewName;
 		if (Pair.Value.IsValid() && Pair.Value->TryGetString(NewName))
 		{

@@ -34,7 +34,7 @@
 #include "K2Node_Select.h"
 #include "K2Node_Message.h"
 #include "EdGraphSchema_K2.h"
-#include "Engine/UserDefinedStruct.h"
+#include "StructUtils/UserDefinedStruct.h"
 #include "Engine/UserDefinedEnum.h"
 #include "Engine/TimelineTemplate.h"
 #include "UnrealEdGlobals.h"

@@ -1,8 +1,13 @@
 #include "MCPServer.h"
 #include "Dom/JsonObject.h"
+#include "Editor.h"
 #include "EditorAssetLibrary.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 #include "UObject/SavePackage.h"
 #include "UObject/UnrealType.h"
+#include "AssetExportTask.h"
+#include "Exporters/Exporter.h"
+#include "Misc/Paths.h"
 
 // Serialize a UObject's properties into a JSON object for inspection.
 // Recursively inlines Instanced sub-objects up to MaxDepth.
@@ -95,6 +100,7 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 	//   op=duplicate_asset: params.source_path, params.dest_path
 	//   op=does_asset_exist: params.path
 	//   op=save_asset: params.path
+	//   op=export_fbx: params.path, params.out_file (absolute .fbx path)
 
 	if (!Params.IsValid())
 	{
@@ -104,7 +110,7 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 	FString Op;
 	if (!Params->TryGetStringField(TEXT("op"), Op) || Op.IsEmpty())
 	{
-		return MakeError(TEXT("Missing 'op' parameter. Supported: duplicate_asset, does_asset_exist, save_asset"));
+		return MakeError(TEXT("Missing 'op' parameter. Supported: duplicate_asset, does_asset_exist, save_asset, export_fbx"));
 	}
 
 	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
@@ -213,6 +219,18 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 		return MakeResponse(true, Data);
 	}
 
+	else if (Op == TEXT("open_asset"))
+	{
+		FString Path;
+		if (!Params->TryGetStringField(TEXT("path"), Path))
+			return MakeError(TEXT("path required"));
+		UObject* Asset = UEditorAssetLibrary::LoadAsset(Path);
+		if (!Asset)
+			return MakeError(FString::Printf(TEXT("Asset not found: %s"), *Path));
+		GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(Asset);
+		Data->SetStringField(TEXT("opened"), Path);
+		return MakeResponse(true, Data);
+	}
 	else if (Op == TEXT("set_subobject_property"))
 	{
 		FString Path, SubObjPath, PropName, ValueText;
@@ -254,6 +272,52 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 		Current->Modify();
 		UEditorAssetLibrary::SaveAsset(Path, false);
 		Data->SetBoolField(TEXT("set"), true);
+		return MakeResponse(true, Data);
+	}
+
+	else if (Op == TEXT("export_fbx"))
+	{
+		// Export an AnimSequence/SkeletalMesh/etc. asset to an FBX file on disk.
+		// params: path (asset path, e.g. /Game/Characters/.../M_Neutral_Idle_turn_left),
+		//         out_file (absolute filesystem path ending in .fbx)
+		FString Path, OutFile;
+		if (!Params->TryGetStringField(TEXT("path"), Path) ||
+			!Params->TryGetStringField(TEXT("out_file"), OutFile))
+		{
+			return MakeError(TEXT("export_fbx requires path and out_file"));
+		}
+
+		UObject* Asset = UEditorAssetLibrary::LoadAsset(Path);
+		if (!Asset)
+		{
+			return MakeError(FString::Printf(TEXT("Asset not found: %s"), *Path));
+		}
+
+		UExporter* Exporter = UExporter::FindExporter(Asset, *FPaths::GetExtension(OutFile));
+		if (!Exporter)
+		{
+			return MakeError(FString::Printf(TEXT("No exporter found for asset class %s with extension %s"),
+				*Asset->GetClass()->GetName(), *FPaths::GetExtension(OutFile)));
+		}
+
+		UAssetExportTask* ExportTask = NewObject<UAssetExportTask>();
+		ExportTask->Object = Asset;
+		ExportTask->Exporter = Exporter;
+		ExportTask->Filename = OutFile;
+		ExportTask->bSelected = false;
+		ExportTask->bReplaceIdentical = true;
+		ExportTask->bPrompt = false;
+		ExportTask->bUseFileArchive = false;
+		ExportTask->bWriteEmptyFiles = false;
+		ExportTask->bAutomated = true;
+
+		const bool bSuccess = UExporter::RunAssetExportTask(ExportTask);
+		Data->SetBoolField(TEXT("exported"), bSuccess);
+		Data->SetStringField(TEXT("out_file"), OutFile);
+		if (!bSuccess)
+		{
+			return MakeError(FString::Printf(TEXT("Export failed for %s -> %s"), *Path, *OutFile));
+		}
 		return MakeResponse(true, Data);
 	}
 

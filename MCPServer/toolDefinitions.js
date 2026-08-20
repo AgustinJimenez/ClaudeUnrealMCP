@@ -1681,11 +1681,12 @@ export const MCP_TOOL_DEFINITIONS = [
           properties: {
             op: {
               type: "string",
-              description: "Operation: duplicate_asset, does_asset_exist, save_asset, inspect_asset, set_property",
+              description: "Operation: duplicate_asset, does_asset_exist, save_asset, inspect_asset, set_property, open_asset, export_fbx",
             },
             source_path: { type: "string", description: "For duplicate_asset" },
             dest_path: { type: "string", description: "For duplicate_asset" },
-            path: { type: "string", description: "For does_asset_exist / save_asset / inspect_asset / set_property" },
+            path: { type: "string", description: "Asset path for does_asset_exist / save_asset / inspect_asset / set_property / open_asset / export_fbx" },
+            out_file: { type: "string", description: "Absolute destination filename for export_fbx" },
             max_depth: { type: "number", description: "For inspect_asset (default 4)" },
             property: { type: "string", description: "For set_property: property name on the asset UObject" },
             value: { type: "string", description: "For set_property: value as text (FProperty::ImportText_Direct format)" },
@@ -2198,6 +2199,64 @@ export const MCP_TOOL_DEFINITIONS = [
         inputSchema: {
           type: "object",
           properties: {},
+        },
+      },
+      {
+        name: "open_asset",
+        description: "Open an asset in the Unreal Editor (Blueprint, Animation, Texture, etc.). The asset will open in its default editor window.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Asset path (e.g. '/Game/Blueprints/SandboxCharacter_CMC')" },
+          },
+          required: ["path"],
+        },
+      },
+      {
+        name: "create_anim_blueprint",
+        description: "Create an Animation Blueprint for a skeleton and save it to the project.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Destination content folder, for example '/Game/Blueprints/Animations'" },
+            asset_name: { type: "string", description: "Name for the new Animation Blueprint" },
+            skeleton_path: { type: "string", description: "Asset path of the target USkeleton" },
+          },
+          required: ["asset_path", "asset_name", "skeleton_path"],
+        },
+      },
+      {
+        name: "setup_fp_spine_pitch_abp",
+        description: "Replace or create a post-process Animation Blueprint containing linked-input, spine, and head Modify Bone nodes. Runtime code can update the generated FAnimNode_ModifyBone rotations directly.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            asset_path: { type: "string", description: "Destination content folder" },
+            asset_name: { type: "string", description: "Animation Blueprint name; an existing asset with this path is replaced" },
+            skeleton_path: { type: "string", description: "Asset path of the target USkeleton" },
+            bone_name: { type: "string", description: "Spine bone to modify (default 'spine_01')" },
+          },
+          required: ["asset_path", "asset_name", "skeleton_path"],
+        },
+      },
+      {
+        name: "move_actor",
+        description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            actor_name: { type: "string", description: "Actor object name or editor label" },
+            x: { type: "number" },
+            y: { type: "number" },
+            z: { type: "number" },
+            pitch: { type: "number" },
+            yaw: { type: "number" },
+            roll: { type: "number" },
+            scale_x: { type: "number" },
+            scale_y: { type: "number" },
+            scale_z: { type: "number" },
+          },
+          required: ["actor_name"],
         },
       },
       {

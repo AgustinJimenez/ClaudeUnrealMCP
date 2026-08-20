@@ -1,6 +1,7 @@
 #include "MCPServer.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
+#include "Subsystems/AssetEditorSubsystem.h"
 #include "Engine/World.h"
 #include "LevelEditor.h"
 #include "Misc/FileHelper.h"
@@ -282,4 +283,37 @@ FString FMCPServer::HandleSetViewportCamera(const TSharedPtr<FJsonObject>& Param
 	}
 
 	return MakeResponse(true, Data);
+}
+
+// ===== OPEN ASSET IN EDITOR =====
+
+FString FMCPServer::HandleOpenAsset(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString AssetPath;
+	if (!Params->TryGetStringField(TEXT("path"), AssetPath) || AssetPath.IsEmpty())
+	{
+		return MakeError(TEXT("path parameter is required (e.g. '/Game/Blueprints/SandboxCharacter_CMC')"));
+	}
+
+	UAssetEditorSubsystem* AssetEditorSubsystem = GEditor->GetEditorSubsystem<UAssetEditorSubsystem>();
+	if (!AssetEditorSubsystem)
+	{
+		return MakeError(TEXT("AssetEditorSubsystem not available"));
+	}
+
+	UObject* Asset = LoadObject<UObject>(nullptr, *AssetPath);
+	if (!Asset)
+	{
+		return MakeError(FString::Printf(TEXT("Asset not found: %s"), *AssetPath));
+	}
+
+	bool bOpened = AssetEditorSubsystem->OpenEditorForAsset(Asset);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("path"), AssetPath);
+	Data->SetStringField(TEXT("name"), Asset->GetName());
+	Data->SetBoolField(TEXT("opened"), bOpened);
+	return MakeResponse(bOpened, Data);
 }

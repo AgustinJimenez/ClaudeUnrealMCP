@@ -28,6 +28,8 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #include "EdGraphSchema_K2.h"
 #include "K2Node_VariableGet.h"
+#include "EditorAnimUtils.h"
+#include "Animation/AnimationAsset.h"
 
 // ===== MONTAGE =====
 
@@ -471,5 +473,73 @@ FString FMCPServer::HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Pa
 	Data->SetBoolField(TEXT("linked_pose_connected"), bLinkedPoseConnected);
 	Data->SetBoolField(TEXT("spine_chain_ok"), LocalToCSOutputPin != nullptr && SpineCompPosePin != nullptr && SpineOutPin != nullptr && HeadCompPosePin != nullptr);
 	Data->SetBoolField(TEXT("head_to_root_ok"), HeadOutPin != nullptr && CSToLocalInputPin != nullptr && CSToLocalOutputPin != nullptr && RootInputPin != nullptr);
+	return MakeResponse(true, Data);
+}
+
+// Retargets an animation asset (AnimSequence, AnimMontage, etc.) from its
+// current Skeleton onto a different one by bone name, using the same
+// underlying EditorAnimUtils::RetargetAnimations() the classic "Retarget
+// Skeleton" right-click tool in the Content Browser calls. This is plain
+// C++ (namespace free functions in the UnrealEd module), not exposed to
+// Blueprint or Python at all - there is no scriptable way to do this
+// without a tool like this one. Only works well when the two skeletons
+// share compatible bone names/hierarchy (no IK Rig retargeting math is
+// applied here, just remapping which Skeleton asset the animation data is
+// interpreted against) - for skeletons with different proportions or bone
+// naming, a proper IK Rig/IK Retargeter setup is needed instead, which
+// this does not attempt.
+FString FMCPServer::HandleRetargetAnimAsset(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString SourceAssetPath, TargetSkeletonPath, DestFolder;
+	if (!Params->TryGetStringField(TEXT("source_asset_path"), SourceAssetPath))
+		return MakeError(TEXT("source_asset_path required"));
+	if (!Params->TryGetStringField(TEXT("target_skeleton_path"), TargetSkeletonPath))
+		return MakeError(TEXT("target_skeleton_path required"));
+	if (!Params->TryGetStringField(TEXT("dest_folder"), DestFolder))
+		return MakeError(TEXT("dest_folder required (e.g. '/Game/ALSHost/Animations')"));
+
+	FString Suffix = Params->HasField(TEXT("name_suffix")) ? Params->GetStringField(TEXT("name_suffix")) : TEXT("");
+	FString Prefix = Params->HasField(TEXT("name_prefix")) ? Params->GetStringField(TEXT("name_prefix")) : TEXT("");
+	bool bConvertSpace = true;
+	Params->TryGetBoolField(TEXT("convert_space"), bConvertSpace);
+
+	UAnimationAsset* SourceAsset = LoadObject<UAnimationAsset>(nullptr, *SourceAssetPath);
+	if (!SourceAsset)
+		return MakeError(FString::Printf(TEXT("Animation asset not found: %s"), *SourceAssetPath));
+
+	USkeleton* NewSkeleton = LoadObject<USkeleton>(nullptr, *TargetSkeletonPath);
+	if (!NewSkeleton)
+		return MakeError(FString::Printf(TEXT("Target skeleton not found: %s"), *TargetSkeletonPath));
+
+	USkeleton* OldSkeleton = SourceAsset->GetSkeleton();
+	if (!OldSkeleton)
+		return MakeError(TEXT("Source asset has no Skeleton set"));
+
+	if (OldSkeleton == NewSkeleton)
+		return MakeError(TEXT("Source asset already targets the requested skeleton"));
+
+	EditorAnimUtils::FNameDuplicationRule NameRule;
+	NameRule.FolderPath = DestFolder;
+	NameRule.Prefix = Prefix;
+	NameRule.Suffix = Suffix;
+
+	TArray<TWeakObjectPtr<UObject>> AssetsToRetarget;
+	AssetsToRetarget.Add(SourceAsset);
+
+	UObject* RetargetedAsset = EditorAnimUtils::RetargetAnimations(
+		OldSkeleton, NewSkeleton, AssetsToRetarget,
+		/*bRetargetReferredAssets=*/true, &NameRule, bConvertSpace);
+
+	if (!RetargetedAsset)
+		return MakeError(TEXT("RetargetAnimations returned no asset - check the source/target skeletons share compatible bone names"));
+
+	UEditorAssetLibrary::SaveAsset(RetargetedAsset->GetPathName(), false);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("source_path"), SourceAssetPath);
+	Data->SetStringField(TEXT("retargeted_path"), RetargetedAsset->GetPathName());
+	Data->SetStringField(TEXT("target_skeleton"), TargetSkeletonPath);
 	return MakeResponse(true, Data);
 }

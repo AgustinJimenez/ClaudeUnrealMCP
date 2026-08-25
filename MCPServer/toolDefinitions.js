@@ -2288,6 +2288,22 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "retarget_anim_asset",
+        description: "Retarget an animation asset (AnimSequence, AnimMontage, etc.) from its current Skeleton onto a different one by bone name, using the same EditorAnimUtils::RetargetAnimations() the classic 'Retarget Skeleton' Content Browser right-click action calls internally - not exposed to Blueprint/Python at all otherwise. Creates a new duplicate asset targeting the new skeleton; does not modify the source. Only works well when the two skeletons share compatible bone names/hierarchy (this remaps which Skeleton asset the data is interpreted against, it does not run IK Rig retargeting math) - for skeletons with meaningfully different proportions or bone naming, a proper IK Rig/IK Retargeter setup is needed instead.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            source_asset_path: { type: "string", description: "Asset path of the animation to retarget (AnimSequence/AnimMontage/etc.)" },
+            target_skeleton_path: { type: "string", description: "Asset path of the destination USkeleton" },
+            dest_folder: { type: "string", description: "Content folder for the new retargeted duplicate, e.g. '/Game/ALSHost/Animations'" },
+            name_prefix: { type: "string", description: "Optional prefix for the duplicate's name" },
+            name_suffix: { type: "string", description: "Optional suffix for the duplicate's name" },
+            convert_space: { type: "boolean", description: "Convert animation data in component space to match the new skeleton's proportions (default true)" },
+          },
+          required: ["source_asset_path", "target_skeleton_path", "dest_folder"],
+        },
+      },
+      {
         name: "move_actor",
         description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
         inputSchema: {

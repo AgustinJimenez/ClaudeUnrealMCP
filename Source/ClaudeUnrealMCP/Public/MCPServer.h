@@ -143,6 +143,7 @@ private:
 	FString HandleAddSocket(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetSocketTransform(const TSharedPtr<FJsonObject>& Params);
 	FString HandleListSockets(const TSharedPtr<FJsonObject>& Params);
+	FString HandleRetargetAnimAsset(const TSharedPtr<FJsonObject>& Params);
 	FString HandleMoveActor(const TSharedPtr<FJsonObject>& Params);
 
 	// State Trees + Audio + Landscape (Sprint 24-26)

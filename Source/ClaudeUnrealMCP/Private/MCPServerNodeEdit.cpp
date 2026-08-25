@@ -66,7 +66,10 @@ FString FMCPServer::HandleDeleteNode(const TSharedPtr<FJsonObject>& Params)
 
 	FString BlueprintPath = Params->GetStringField(TEXT("blueprint_path"));
 	FString NodeId = Params->GetStringField(TEXT("node_id"));
-	FString GraphName = Params->HasField(TEXT("graph_name")) ? Params->GetStringField(TEXT("graph_name")) : TEXT("EventGraph");
+	// Optional narrowing filter. Empty/absent means "search every graph in the blueprint,
+	// including nested ones" (AnimGraph state/transition sub-graphs, macro graphs, etc.) -
+	// the node GUID is unique blueprint-wide, so a graph name is not required to disambiguate.
+	FString GraphName = Params->HasField(TEXT("graph_name")) ? Params->GetStringField(TEXT("graph_name")) : TEXT("");
 
 	UBlueprint* Blueprint = LoadBlueprintFromPath(BlueprintPath);
 	if (!Blueprint)
@@ -74,48 +77,69 @@ FString FMCPServer::HandleDeleteNode(const TSharedPtr<FJsonObject>& Params)
 		return MakeError(FString::Printf(TEXT("Failed to load blueprint: %s"), *BlueprintPath));
 	}
 
-	// Find the target graph
-	UEdGraph* TargetGraph = nullptr;
-	for (UEdGraph* Graph : Blueprint->UbergraphPages)
+	// Collect all graphs, including nested ones (AnimGraph state machines nest a graph per
+	// state and per transition rule; these are NOT reachable via UbergraphPages/FunctionGraphs
+	// alone, only via each node's GetSubGraphs()).
+	TArray<UEdGraph*> AllGraphs;
+	Blueprint->GetAllGraphs(AllGraphs);
+	TArray<UEdGraph*> GraphsToProcess = AllGraphs;
+	while (GraphsToProcess.Num() > 0)
 	{
-		if (Graph && Graph->GetName() == GraphName)
+		UEdGraph* G = GraphsToProcess.Pop();
+		if (!G) continue;
+		for (UEdGraphNode* N : G->Nodes)
 		{
-			TargetGraph = Graph;
-			break;
+			if (!N) continue;
+			for (UEdGraph* Sub : N->GetSubGraphs())
+			{
+				if (Sub && !AllGraphs.Contains(Sub))
+				{
+					AllGraphs.Add(Sub);
+					GraphsToProcess.Add(Sub);
+				}
+			}
 		}
 	}
 
-	if (!TargetGraph)
-	{
-		return MakeError(FString::Printf(TEXT("Graph not found: %s"), *GraphName));
-	}
-
-	// Find the node by GUID
+	// Find the node by GUID across every collected graph (optionally narrowed by graph_name)
+	UEdGraph* TargetGraph = nullptr;
 	UEdGraphNode* NodeToDelete = nullptr;
 	FString NodeTitle;
-	for (UEdGraphNode* Node : TargetGraph->Nodes)
+	for (UEdGraph* Graph : AllGraphs)
 	{
-		if (Node)
+		if (!Graph) continue;
+		if (!GraphName.IsEmpty() && Graph->GetName() != GraphName) continue;
+
+		for (UEdGraphNode* Node : Graph->Nodes)
 		{
+			if (!Node) continue;
 			FString NodeGuidStr = Node->NodeGuid.ToString(EGuidFormats::DigitsWithHyphensLower);
 			FString NodeGuidStrUpper = Node->NodeGuid.ToString(EGuidFormats::Digits);
 			if (NodeGuidStr.Equals(NodeId, ESearchCase::IgnoreCase) ||
 				NodeGuidStrUpper.Equals(NodeId, ESearchCase::IgnoreCase))
 			{
+				TargetGraph = Graph;
 				NodeToDelete = Node;
 				NodeTitle = Node->GetNodeTitle(ENodeTitleType::ListView).ToString();
 				break;
 			}
 		}
+		if (NodeToDelete) break;
 	}
 
 	if (!NodeToDelete)
 	{
-		return MakeError(FString::Printf(TEXT("Node not found with ID: %s"), *NodeId));
+		return MakeError(FString::Printf(TEXT("Node not found with ID: %s%s"), *NodeId,
+			GraphName.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (narrowed to graph '%s')"), *GraphName)));
 	}
 
-	// Remove the node
-	TargetGraph->RemoveNode(NodeToDelete);
+	// Remove the node via FBlueprintEditorUtils, not the graph's raw RemoveNode(): the raw
+	// call just drops the node from the array without breaking pin links or notifying owning
+	// blueprint extensions (e.g. AnimBlueprintExtension_StateMachine caches a TargetRootNode
+	// per state/transition graph). Skipping that cleanup leaves dangling state that can crash
+	// a later compile with an internal engine assertion, particularly for nodes inside
+	// AnimGraph state machine sub-graphs.
+	FBlueprintEditorUtils::RemoveNode(Blueprint, NodeToDelete, /*bDontRecompile=*/true);
 
 	// Mark blueprint as modified
 	FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);

@@ -300,12 +300,17 @@ FString FMCPServer::HandleRemoveErrorNodes(const TSharedPtr<FJsonObject>& Params
 		}
 	}
 
-	// Remove the bad nodes
+	// Remove the bad nodes. Use FBlueprintEditorUtils::RemoveNode() rather than the graph's
+	// raw RemoveNode(): the raw call just drops the node from the array without breaking pin
+	// links or notifying owning blueprint extensions (e.g. AnimBlueprintExtension_StateMachine
+	// caches a TargetRootNode per state/transition graph). Skipping that cleanup leaves
+	// dangling state that can crash the verification compile below with an internal engine
+	// assertion, particularly for error nodes inside AnimGraph state machine sub-graphs.
 	for (UEdGraphNode* NodeToRemove : NodesToRemove)
 	{
 		if (NodeToRemove && NodeToRemove->GetGraph())
 		{
-			NodeToRemove->GetGraph()->RemoveNode(NodeToRemove);
+			FBlueprintEditorUtils::RemoveNode(Blueprint, NodeToRemove, /*bDontRecompile=*/true);
 			NodesRemoved++;
 		}
 	}

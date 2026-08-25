@@ -2240,6 +2240,54 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "add_socket",
+        description: "Add a new socket to a Skeleton asset, parented to a bone. Sockets are needed for anything that must query a runtime-accurate attach point (muzzle location, grip points, etc.) via GetSocketLocation/GetSocketRotation - USkeleton::Sockets is not readable/writable from Python, so this is the only way to author one outside the Skeleton Editor UI.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            skeleton_path: { type: "string", description: "Asset path of the target USkeleton" },
+            bone_name: { type: "string", description: "Bone to parent the socket to" },
+            socket_name: { type: "string", description: "Name for the new socket; must not already exist" },
+            x: { type: "number", description: "Relative location X (default 0)" },
+            y: { type: "number", description: "Relative location Y (default 0)" },
+            z: { type: "number", description: "Relative location Z (default 0)" },
+            pitch: { type: "number", description: "Relative rotation pitch (default 0)" },
+            yaw: { type: "number", description: "Relative rotation yaw (default 0)" },
+            roll: { type: "number", description: "Relative rotation roll (default 0)" },
+          },
+          required: ["skeleton_path", "bone_name", "socket_name"],
+        },
+      },
+      {
+        name: "set_socket_transform",
+        description: "Update the relative location and/or rotation of an existing Skeleton socket. Only supplied fields are changed.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            skeleton_path: { type: "string", description: "Asset path of the target USkeleton" },
+            socket_name: { type: "string", description: "Name of the existing socket to edit" },
+            x: { type: "number" },
+            y: { type: "number" },
+            z: { type: "number" },
+            pitch: { type: "number" },
+            yaw: { type: "number" },
+            roll: { type: "number" },
+          },
+          required: ["skeleton_path", "socket_name"],
+        },
+      },
+      {
+        name: "list_sockets",
+        description: "List all sockets defined on a Skeleton asset, with their bone, relative location, and rotation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            skeleton_path: { type: "string", description: "Asset path of the target USkeleton" },
+          },
+          required: ["skeleton_path"],
+        },
+      },
+      {
         name: "move_actor",
         description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
         inputSchema: {

@@ -140,6 +140,9 @@ private:
 	FString HandleReadAnimSequence(const TSharedPtr<FJsonObject>& Params);
 	FString HandleCreateAnimBlueprint(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetupFpSpinePitchAbp(const TSharedPtr<FJsonObject>& Params);
+	FString HandleAddSocket(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetSocketTransform(const TSharedPtr<FJsonObject>& Params);
+	FString HandleListSockets(const TSharedPtr<FJsonObject>& Params);
 	FString HandleMoveActor(const TSharedPtr<FJsonObject>& Params);
 
 	// State Trees + Audio + Landscape (Sprint 24-26)

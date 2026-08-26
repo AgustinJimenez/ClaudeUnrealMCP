@@ -2304,6 +2304,21 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "compare_anim_bone_pose",
+        description: "Compare a bone's component-space (world-relative-to-actor-root) transform between two animations at two given times, using UAnimPoseExtensions::GetAnimPoseAtTime/GetBonePose - not otherwise exposed to Blueprint/Python. Returns both poses plus the delta (B expressed relative to A). Useful for diagnosing a weapon/hand mismatch: if a known-good animation (e.g. an aim-pose sweep) and a problem animation (e.g. a retargeted reload) differ by a roughly constant delta at the grip bone (commonly 'hand_r'), that delta is a good starting point for a corrective offset; if the delta varies a lot between frames, the mismatch isn't a simple constant offset.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            anim_path_a: { type: "string", description: "Asset path of the first (e.g. known-good reference) animation" },
+            time_a: { type: "number", description: "Time in seconds into anim_path_a to sample" },
+            anim_path_b: { type: "string", description: "Asset path of the second (e.g. problem) animation" },
+            time_b: { type: "number", description: "Time in seconds into anim_path_b to sample" },
+            bone_name: { type: "string", description: "Bone to compare, e.g. 'hand_r' (default: hand_r)" },
+          },
+          required: ["anim_path_a", "time_a", "anim_path_b", "time_b"],
+        },
+      },
+      {
         name: "move_actor",
         description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
         inputSchema: {

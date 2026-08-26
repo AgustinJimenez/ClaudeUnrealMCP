@@ -188,8 +188,37 @@ FString FMCPServer::HandleSetComponentProperty(const TSharedPtr<FJsonObject>& Pa
 		return MakeError(FString::Printf(TEXT("Property not found: %s"), *PropertyName));
 	}
 
+	// FClassProperty (TSubclassOf<T>) derives from FObjectProperty, so it
+	// must be checked first - otherwise it falls into the FObjectProperty
+	// branch below and gets a UBlueprint/UWidgetBlueprint *asset* stored
+	// directly into a UClass* slot (a TSubclassOf's underlying value must
+	// always be an actual UClass, e.g. the Blueprint's GeneratedClass, not
+	// the editor asset that owns it). That mismatch doesn't fail loudly -
+	// it silently corrupts the property and crashes the editor later, on
+	// save/serialize, with an unrelated-looking assertion deep in
+	// PropertyClass.cpp. Hit via DebugReloadTuningWidgetClass
+	// (TSubclassOf<UUserWidget>) - see AGENTS.md.
+	if (FClassProperty* ClassProp = CastField<FClassProperty>(Property))
+	{
+		UObject* Loaded = LoadObject<UObject>(nullptr, *PropertyValue);
+		UClass* ResolvedClass = Cast<UClass>(Loaded);
+		if (!ResolvedClass)
+		{
+			if (UBlueprint* ReferencedBlueprint = Cast<UBlueprint>(Loaded))
+			{
+				ResolvedClass = ReferencedBlueprint->GeneratedClass;
+			}
+		}
+
+		if (!ResolvedClass)
+		{
+			return MakeError(FString::Printf(TEXT("Could not resolve class from: %s"), *PropertyValue));
+		}
+
+		ClassProp->SetObjectPropertyValue(ClassProp->ContainerPtrToValuePtr<void>(ComponentTemplate), ResolvedClass);
+	}
 	// Handle object reference properties (like UInputAction*)
-	if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Property))
+	else if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Property))
 	{
 		// Load the referenced object
 		UObject* ReferencedObject = LoadObject<UObject>(nullptr, *PropertyValue);

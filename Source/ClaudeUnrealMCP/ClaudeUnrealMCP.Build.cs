@@ -51,7 +51,8 @@ public class ClaudeUnrealMCP : ModuleRules
 			"MovieSceneTracks",  // For transform/audio/event tracks
 			"AnimGraph",  // For UAnimGraphNode_ModifyBone, AnimGraph editor nodes
 			"AnimGraphRuntime",  // For FAnimNode_ModifyBone runtime structs
-			"SkeletonEditor"  // For IEditableSkeleton::AddSocket/RenameSocket
+			"SkeletonEditor",  // For IEditableSkeleton::AddSocket/RenameSocket
+			"AnimationBlueprintLibrary"  // For UAnimPoseExtensions::GetAnimPoseAtTime/GetBonePose
 		});
 	}
 }

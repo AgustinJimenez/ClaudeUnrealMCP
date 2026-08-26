@@ -30,6 +30,7 @@
 #include "K2Node_VariableGet.h"
 #include "EditorAnimUtils.h"
 #include "Animation/AnimationAsset.h"
+#include "AnimPose.h"
 
 // ===== MONTAGE =====
 
@@ -541,5 +542,82 @@ FString FMCPServer::HandleRetargetAnimAsset(const TSharedPtr<FJsonObject>& Param
 	Data->SetStringField(TEXT("source_path"), SourceAssetPath);
 	Data->SetStringField(TEXT("retargeted_path"), RetargetedAsset->GetPathName());
 	Data->SetStringField(TEXT("target_skeleton"), TargetSkeletonPath);
+	return MakeResponse(true, Data);
+}
+
+static TSharedPtr<FJsonObject> SerializeTransform(const FTransform& Transform)
+{
+	const FVector Loc = Transform.GetLocation();
+	const FRotator Rot = Transform.Rotator();
+	TSharedPtr<FJsonObject> Obj = MakeShared<FJsonObject>();
+	TSharedPtr<FJsonObject> LocObj = MakeShared<FJsonObject>();
+	LocObj->SetNumberField(TEXT("x"), Loc.X);
+	LocObj->SetNumberField(TEXT("y"), Loc.Y);
+	LocObj->SetNumberField(TEXT("z"), Loc.Z);
+	TSharedPtr<FJsonObject> RotObj = MakeShared<FJsonObject>();
+	RotObj->SetNumberField(TEXT("pitch"), Rot.Pitch);
+	RotObj->SetNumberField(TEXT("yaw"), Rot.Yaw);
+	RotObj->SetNumberField(TEXT("roll"), Rot.Roll);
+	Obj->SetObjectField(TEXT("location"), LocObj);
+	Obj->SetObjectField(TEXT("rotation"), RotObj);
+	return Obj;
+}
+
+// Compares a bone's component-space transform between two animations at two
+// given times - built to answer "what offset would make this weapon's grip
+// bone match a known-good animation's grip bone", since our HeldObjectRoot
+// offset is a single constant applied relative to a fixed virtual bone that
+// itself rigidly follows this exact real bone (hand_r) every frame. If the
+// mismatch is a genuinely constant offset (not a per-frame drift), "delta"
+// below is directly usable as ReloadHeldObjectLocationOffset/RotationOffset.
+FString FMCPServer::HandleCompareAnimBonePose(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString AnimPathA, AnimPathB, BoneName;
+	double TimeA = 0.0, TimeB = 0.0;
+	if (!Params->TryGetStringField(TEXT("anim_path_a"), AnimPathA))
+		return MakeError(TEXT("anim_path_a required"));
+	if (!Params->TryGetStringField(TEXT("anim_path_b"), AnimPathB))
+		return MakeError(TEXT("anim_path_b required"));
+	if (!Params->TryGetNumberField(TEXT("time_a"), TimeA))
+		return MakeError(TEXT("time_a required (seconds)"));
+	if (!Params->TryGetNumberField(TEXT("time_b"), TimeB))
+		return MakeError(TEXT("time_b required (seconds)"));
+	if (!Params->TryGetStringField(TEXT("bone_name"), BoneName))
+		BoneName = TEXT("hand_r");
+
+	UAnimSequenceBase* AnimA = LoadObject<UAnimSequenceBase>(nullptr, *AnimPathA);
+	if (!AnimA)
+		return MakeError(FString::Printf(TEXT("Animation not found: %s"), *AnimPathA));
+
+	UAnimSequenceBase* AnimB = LoadObject<UAnimSequenceBase>(nullptr, *AnimPathB);
+	if (!AnimB)
+		return MakeError(FString::Printf(TEXT("Animation not found: %s"), *AnimPathB));
+
+	FAnimPoseEvaluationOptions EvalOptions;
+	FAnimPose PoseA, PoseB;
+	UAnimPoseExtensions::GetAnimPoseAtTime(AnimA, TimeA, EvalOptions, PoseA);
+	UAnimPoseExtensions::GetAnimPoseAtTime(AnimB, TimeB, EvalOptions, PoseB);
+
+	TArray<FName> BoneNamesA, BoneNamesB;
+	UAnimPoseExtensions::GetBoneNames(PoseA, BoneNamesA);
+	UAnimPoseExtensions::GetBoneNames(PoseB, BoneNamesB);
+	if (!BoneNamesA.Contains(FName(*BoneName)))
+		return MakeError(FString::Printf(TEXT("Bone '%s' not found in %s"), *BoneName, *AnimPathA));
+	if (!BoneNamesB.Contains(FName(*BoneName)))
+		return MakeError(FString::Printf(TEXT("Bone '%s' not found in %s"), *BoneName, *AnimPathB));
+
+	const FTransform TransformA = UAnimPoseExtensions::GetBonePose(PoseA, FName(*BoneName), EAnimPoseSpaces::World);
+	const FTransform TransformB = UAnimPoseExtensions::GetBonePose(PoseB, FName(*BoneName), EAnimPoseSpaces::World);
+
+	// B relative to A: the transform that, applied on top of A, produces B.
+	const FTransform DeltaBRelativeToA = TransformB.GetRelativeTransform(TransformA);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("bone_name"), BoneName);
+	Data->SetObjectField(TEXT("pose_a"), SerializeTransform(TransformA));
+	Data->SetObjectField(TEXT("pose_b"), SerializeTransform(TransformB));
+	Data->SetObjectField(TEXT("delta_b_relative_to_a"), SerializeTransform(DeltaBRelativeToA));
 	return MakeResponse(true, Data);
 }

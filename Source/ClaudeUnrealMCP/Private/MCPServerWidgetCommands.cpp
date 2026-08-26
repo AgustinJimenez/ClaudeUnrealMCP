@@ -153,6 +153,20 @@ FString FMCPServer::HandleAddWidget(const TSharedPtr<FJsonObject>& Params)
 
 	UPanelSlot* Slot = Parent->AddChild(NewWidget);
 
+	// Widgets created through the Designer go through
+	// FWidgetBlueprintEditorUtils::CreateWidget, which registers a GUID for
+	// the new widget in WidgetVariableNameToGuidMap. ConstructWidget above
+	// bypasses that entirely, so without this the compiler's own internal
+	// consistency check (WidgetBlueprintCompiler.cpp, "Widget was added but
+	// did not get a GUID") fails - as an ensure() on some widget types, but
+	// as a hard crash immediately after on others (hit via a Button widget;
+	// see AGENTS.md). Harmless to add for every widget even if it never
+	// becomes a Blueprint variable.
+	if (!WBP->WidgetVariableNameToGuidMap.Contains(NewWidget->GetFName()))
+	{
+		WBP->WidgetVariableNameToGuidMap.Add(NewWidget->GetFName(), FGuid::NewGuid());
+	}
+
 	// Set canvas slot position if parent is CanvasPanel
 	if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
 	{
@@ -210,11 +224,25 @@ FString FMCPServer::HandleSetWidgetProperty(const TSharedPtr<FJsonObject>& Param
 	// Generic property setter via FProperty
 	{
 		FProperty* Prop = FindFProperty<FProperty>(Widget->GetClass(), *PropertyName);
-		if (!Prop)
-			return MakeError(FString::Printf(TEXT("Property '%s' not found on widget class %s"), *PropertyName, *Widget->GetClass()->GetName()));
+		UObject* PropOwner = Widget;
 
-		void* ValPtr = Prop->ContainerPtrToValuePtr<void>(Widget);
-		const TCHAR* Result = Prop->ImportText_Direct(*Value, ValPtr, Widget, PPF_None);
+		// Layout properties (Size, Padding, HorizontalAlignment,
+		// VerticalAlignment, ...) live on the child's UPanelSlot (e.g.
+		// UHorizontalBoxSlot::Size, a FSlateChildSize{SizeRule,Value} - used
+		// to give a Slider real width inside a HorizontalBox row instead of
+		// the tiny default auto-sized one), not on the UWidget itself. Fall
+		// back to the slot's class when the widget class doesn't have it.
+		if (!Prop && Widget->Slot)
+		{
+			Prop = FindFProperty<FProperty>(Widget->Slot->GetClass(), *PropertyName);
+			PropOwner = Widget->Slot;
+		}
+
+		if (!Prop)
+			return MakeError(FString::Printf(TEXT("Property '%s' not found on widget class %s or its slot"), *PropertyName, *Widget->GetClass()->GetName()));
+
+		void* ValPtr = Prop->ContainerPtrToValuePtr<void>(PropOwner);
+		const TCHAR* Result = Prop->ImportText_Direct(*Value, ValPtr, PropOwner, PPF_None);
 		if (!Result)
 			return MakeError(FString::Printf(TEXT("Failed to import value '%s' for property %s"), *Value, *PropertyName));
 	}

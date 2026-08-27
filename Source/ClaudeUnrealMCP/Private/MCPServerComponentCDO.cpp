@@ -236,8 +236,41 @@ FString FMCPServer::HandleSetBlueprintCDOProperty(const TSharedPtr<FJsonObject>&
 	// Handle different property types
 	void* ValuePtr = Property->ContainerPtrToValuePtr<void>(CDO);
 
+	// FClassProperty (TSubclassOf<T>) derives from FObjectProperty in the
+	// FFieldClass hierarchy too, so CastField<FObjectProperty> below would
+	// already match it - meaning the dedicated "Handle class property"
+	// branch further down (which correctly uses LoadClass, resolving
+	// Blueprint _C generated classes properly) was actually dead,
+	// unreachable code. Same bug class as HandleSetComponentProperty (see
+	// MCPServerComponentEdit.cpp / AGENTS.md): without this check running
+	// first, a TSubclassOf property would get a UBlueprint/UWidgetBlueprint
+	// *asset* stored directly into its UClass* slot instead of the actual
+	// class - no error at set time, corrupts the property, crashes later.
+	if (FClassProperty* CDOClassProp = CastField<FClassProperty>(Property))
+	{
+		if (PropertyValue.IsEmpty() || PropertyValue.Equals(TEXT("None"), ESearchCase::IgnoreCase))
+		{
+			CDOClassProp->SetObjectPropertyValue(ValuePtr, nullptr);
+		}
+		else
+		{
+			UClass* ClassValue = LoadClass<UObject>(nullptr, *PropertyValue);
+			if (!ClassValue)
+			{
+				return MakeError(FString::Printf(TEXT("Could not load class: %s"), *PropertyValue));
+			}
+
+			if (!ClassValue->IsChildOf(CDOClassProp->MetaClass))
+			{
+				return MakeError(FString::Printf(TEXT("Class %s is not compatible with metaclass %s"),
+					*ClassValue->GetName(), *CDOClassProp->MetaClass->GetName()));
+			}
+
+			CDOClassProp->SetObjectPropertyValue(ValuePtr, ClassValue);
+		}
+	}
 	// Handle object property (TObjectPtr<>, UObject*, etc.)
-	if (FObjectProperty* ObjectProp = CastField<FObjectProperty>(Property))
+	else if (FObjectProperty* ObjectProp = CastField<FObjectProperty>(Property))
 	{
 		if (PropertyValue.IsEmpty() || PropertyValue.Equals(TEXT("None"), ESearchCase::IgnoreCase))
 		{

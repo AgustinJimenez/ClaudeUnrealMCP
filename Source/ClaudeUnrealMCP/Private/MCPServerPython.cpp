@@ -8,6 +8,9 @@
 #include "AssetExportTask.h"
 #include "Exporters/Exporter.h"
 #include "Misc/Paths.h"
+#include "Kismet2/BlueprintEditorUtils.h"
+#include "EdGraph/EdGraph.h"
+#include "EdGraph/EdGraphNode.h"
 
 // Serialize a UObject's properties into a JSON object for inspection.
 // Recursively inlines Instanced sub-objects up to MaxDepth.
@@ -319,6 +322,97 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 			return MakeError(FString::Printf(TEXT("Export failed for %s -> %s"), *Path, *OutFile));
 		}
 		return MakeResponse(true, Data);
+	}
+
+	else if (Op == TEXT("inspect_graph_node") || Op == TEXT("set_graph_node_property"))
+	{
+		// Reads (or sets) properties on a graph node by GUID that live on the
+		// node object itself, not exposed as a pin - e.g. AnimGraphNode_TwoBoneIK's
+		// EffectorTarget (bone/socket the IK reaches for), which read_function_graphs
+		// doesn't surface since it only walks Pins. Same node-lookup pattern as
+		// set_pin_default/connect_nodes (Blueprint->GetAllGraphs + GUID match) -
+		// works for both nested AnimGraph sub-graphs (GetAllGraphs recurses into
+		// state machines/anim layers already) and plain function graphs.
+		FString BPPath, GraphName, NodeGuid;
+		if (!Params->TryGetStringField(TEXT("blueprint_path"), BPPath) ||
+			!Params->TryGetStringField(TEXT("graph_name"), GraphName) ||
+			!Params->TryGetStringField(TEXT("node_guid"), NodeGuid))
+		{
+			return MakeError(TEXT("blueprint_path, graph_name, node_guid required"));
+		}
+
+		UBlueprint* Blueprint = LoadBlueprintFromPath(BPPath);
+		if (!Blueprint)
+		{
+			return MakeError(FString::Printf(TEXT("Blueprint not found: %s"), *BPPath));
+		}
+
+		TArray<UEdGraph*> AllGraphs;
+		Blueprint->GetAllGraphs(AllGraphs);
+
+		UEdGraphNode* FoundNode = nullptr;
+		for (UEdGraph* Graph : AllGraphs)
+		{
+			if (Graph->GetName() != GraphName)
+			{
+				continue;
+			}
+			for (UEdGraphNode* Node : Graph->Nodes)
+			{
+				if (Node->NodeGuid.ToString() == NodeGuid ||
+					Node->NodeGuid.ToString(EGuidFormats::DigitsWithHyphensInBraces) == NodeGuid ||
+					Node->NodeGuid.ToString(EGuidFormats::Digits) == NodeGuid)
+				{
+					FoundNode = Node;
+					break;
+				}
+			}
+			if (FoundNode)
+			{
+				break;
+			}
+		}
+
+		if (!FoundNode)
+		{
+			return MakeError(FString::Printf(TEXT("Node with GUID '%s' not found in graph '%s'"), *NodeGuid, *GraphName));
+		}
+
+		if (Op == TEXT("inspect_graph_node"))
+		{
+			int32 MaxDepth = 2;
+			Params->TryGetNumberField(TEXT("max_depth"), MaxDepth);
+			Data->SetObjectField(TEXT("node"), SerializeObjectToJson(FoundNode, 0, MaxDepth));
+			return MakeResponse(true, Data);
+		}
+		else
+		{
+			FString PropName, ValueText;
+			if (!Params->TryGetStringField(TEXT("property"), PropName) ||
+				!Params->TryGetStringField(TEXT("value"), ValueText))
+			{
+				return MakeError(TEXT("set_graph_node_property requires property, value"));
+			}
+
+			FProperty* Prop = FindFProperty<FProperty>(FoundNode->GetClass(), *PropName);
+			if (!Prop)
+			{
+				return MakeError(FString::Printf(TEXT("Property '%s' not found on node class %s"), *PropName, *FoundNode->GetClass()->GetName()));
+			}
+
+			void* ValPtr = Prop->ContainerPtrToValuePtr<void>(FoundNode);
+			const TCHAR* Result = Prop->ImportText_Direct(*ValueText, ValPtr, FoundNode, PPF_None);
+			if (!Result)
+			{
+				return MakeError(FString::Printf(TEXT("Failed to import value '%s' for property %s"), *ValueText, *PropName));
+			}
+
+			FoundNode->Modify();
+			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+			UEditorAssetLibrary::SaveAsset(BPPath, false);
+			Data->SetBoolField(TEXT("set"), true);
+			return MakeResponse(true, Data);
+		}
 	}
 
 	return MakeError(FString::Printf(TEXT("Unknown op: %s"), *Op));

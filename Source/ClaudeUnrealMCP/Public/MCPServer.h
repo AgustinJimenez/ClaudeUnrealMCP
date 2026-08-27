@@ -48,6 +48,7 @@ private:
 	FString HandleReplaceComponentMapValue(const TSharedPtr<FJsonObject>& Params);
 	FString HandleReplaceBlueprintArrayValue(const TSharedPtr<FJsonObject>& Params);
 	FString HandleAddInputMapping(const TSharedPtr<FJsonObject>& Params);
+	FString HandleRemoveInputMapping(const TSharedPtr<FJsonObject>& Params);
 	FString HandleReparentBlueprint(const TSharedPtr<FJsonObject>& Params);
 	FString HandleCompileBlueprint(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSaveAsset(const TSharedPtr<FJsonObject>& Params);
@@ -145,6 +146,7 @@ private:
 	FString HandleListSockets(const TSharedPtr<FJsonObject>& Params);
 	FString HandleRetargetAnimAsset(const TSharedPtr<FJsonObject>& Params);
 	FString HandleCompareAnimBonePose(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetAnimCurveKeys(const TSharedPtr<FJsonObject>& Params);
 	FString HandleMoveActor(const TSharedPtr<FJsonObject>& Params);
 
 	// State Trees + Audio + Landscape (Sprint 24-26)
@@ -204,6 +206,7 @@ private:
 	// Widget Blueprint / UMG (Sprint 13)
 	FString HandleCreateWidgetBlueprint(const TSharedPtr<FJsonObject>& Params);
 	FString HandleAddWidget(const TSharedPtr<FJsonObject>& Params);
+	FString HandleRemoveWidget(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetWidgetProperty(const TSharedPtr<FJsonObject>& Params);
 	FString HandleReadWidgetTree(const TSharedPtr<FJsonObject>& Params);
 

@@ -189,6 +189,39 @@ FString FMCPServer::HandleAddWidget(const TSharedPtr<FJsonObject>& Params)
 	return MakeResponse(true, Data);
 }
 
+FString FMCPServer::HandleRemoveWidget(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString BlueprintPath, WidgetName;
+	if (!Params->TryGetStringField(TEXT("blueprint_path"), BlueprintPath))
+		return MakeError(TEXT("blueprint_path required"));
+	if (!Params->TryGetStringField(TEXT("widget_name"), WidgetName))
+		return MakeError(TEXT("widget_name required"));
+
+	UWidgetBlueprint* WBP = LoadObject<UWidgetBlueprint>(nullptr, *BlueprintPath);
+	if (!WBP || !WBP->WidgetTree)
+		return MakeError(TEXT("Widget blueprint not found or has no widget tree"));
+
+	UWidget* Widget = WBP->WidgetTree->FindWidget(FName(*WidgetName));
+	if (!Widget)
+		return MakeError(FString::Printf(TEXT("Widget not found: %s"), *WidgetName));
+
+	if (Widget == WBP->WidgetTree->RootWidget)
+		return MakeError(TEXT("Cannot remove the root widget"));
+
+	const bool bRemoved = WBP->WidgetTree->RemoveWidget(Widget);
+	if (!bRemoved)
+		return MakeError(FString::Printf(TEXT("Failed to remove widget: %s"), *WidgetName));
+
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WBP);
+	UEditorAssetLibrary::SaveAsset(BlueprintPath, false);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("message"), FString::Printf(TEXT("Removed widget %s (and its children) from %s"), *WidgetName, *WBP->GetName()));
+	return MakeResponse(true, Data);
+}
+
 FString FMCPServer::HandleSetWidgetProperty(const TSharedPtr<FJsonObject>& Params)
 {
 	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));

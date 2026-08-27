@@ -479,6 +479,28 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "remove_input_mapping",
+        description: "Remove a key mapping from an input mapping context, via UInputMappingContext::UnmapKey/UnmapAllKeysFromAction - the counterpart to add_input_mapping, which has no built-in way to remove what it added. Useful when a mapping context was duplicated from an existing one (e.g. via run_python duplicate_asset) and inherited mappings that shouldn't be active in the new context.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            context_path: {
+              type: "string",
+              description: "Full path to the input mapping context asset",
+            },
+            action_path: {
+              type: "string",
+              description: "Full path to the input action asset",
+            },
+            key: {
+              type: "string",
+              description: "Key name to unmap (e.g., LeftMouseButton). Omit to unmap ALL keys currently mapped to this action in this context.",
+            },
+          },
+          required: ["context_path", "action_path"],
+        },
+      },
+      {
         name: "reparent_blueprint",
         description: "Reparent a blueprint to a new parent class",
         inputSchema: {
@@ -1681,15 +1703,18 @@ export const MCP_TOOL_DEFINITIONS = [
           properties: {
             op: {
               type: "string",
-              description: "Operation: duplicate_asset, does_asset_exist, save_asset, inspect_asset, set_property, open_asset, export_fbx",
+              description: "Operation: duplicate_asset, does_asset_exist, save_asset, inspect_asset, set_property, open_asset, export_fbx, inspect_graph_node, set_graph_node_property",
             },
             source_path: { type: "string", description: "For duplicate_asset" },
             dest_path: { type: "string", description: "For duplicate_asset" },
             path: { type: "string", description: "Asset path for does_asset_exist / save_asset / inspect_asset / set_property / open_asset / export_fbx" },
             out_file: { type: "string", description: "Absolute destination filename for export_fbx" },
-            max_depth: { type: "number", description: "For inspect_asset (default 4)" },
-            property: { type: "string", description: "For set_property: property name on the asset UObject" },
-            value: { type: "string", description: "For set_property: value as text (FProperty::ImportText_Direct format)" },
+            max_depth: { type: "number", description: "For inspect_asset / inspect_graph_node (default 4 / 2)" },
+            property: { type: "string", description: "For set_property / set_graph_node_property: property name on the object" },
+            value: { type: "string", description: "For set_property / set_graph_node_property: value as text (FProperty::ImportText_Direct format)" },
+            blueprint_path: { type: "string", description: "For inspect_graph_node / set_graph_node_property: Blueprint asset path" },
+            graph_name: { type: "string", description: "For inspect_graph_node / set_graph_node_property: name of the graph containing the node (e.g. 'AnimGraph', 'HandIK')" },
+            node_guid: { type: "string", description: "For inspect_graph_node / set_graph_node_property: node GUID from read_function_graphs/read_event_graph" },
           },
           required: ["op"],
         },
@@ -2319,6 +2344,20 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "set_anim_curve_keys",
+        description: "Author a float curve (constant or keyed) directly onto an AnimSequence/AnimMontage, via UAnimationBlueprintLibrary::AddCurve/AddFloatCurveKeys - not otherwise exposed to Blueprint node-authoring through this MCP. Useful for baking ALS-specific gating curves (e.g. Enable_HandIK_L, Layering_Arm_L - see ALS_AnimBP's HandIK graph) onto an animation retargeted from a project that didn't use ALS's curve conventions. The curve name must already exist in the target Skeleton's curve metadata (check via run_python inspect_asset on the Skeleton) for the AnimGraph's GetCurveValue lookups to see it. For a constant value across the whole clip, pass two keys: times=[0, clip_length], values=[v, v].",
+        inputSchema: {
+          type: "object",
+          properties: {
+            anim_path: { type: "string", description: "Asset path of the AnimSequence/AnimMontage to add the curve to" },
+            curve_name: { type: "string", description: "Curve name, must already exist in the target Skeleton's curve metadata (e.g. 'Enable_HandIK_L')" },
+            times: { type: "array", items: { type: "number" }, description: "Key times in seconds, same length as values" },
+            values: { type: "array", items: { type: "number" }, description: "Key values, same length as times" },
+          },
+          required: ["anim_path", "curve_name", "times", "values"],
+        },
+      },
+      {
         name: "move_actor",
         description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
         inputSchema: {
@@ -2473,6 +2512,18 @@ export const MCP_TOOL_DEFINITIONS = [
             height: { type: "number", description: "Height (CanvasPanel only, default 50)" },
           },
           required: ["blueprint_path", "widget_type"],
+        },
+      },
+      {
+        name: "remove_widget",
+        description: "Remove a widget (and its children) from a Widget Blueprint's tree, via UWidgetTree::RemoveWidget - the counterpart to add_widget, which has no built-in way to undo/restructure what it added. Cannot remove the root widget.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Widget blueprint path" },
+            widget_name: { type: "string", description: "Name of the widget to remove" },
+          },
+          required: ["blueprint_path", "widget_name"],
         },
       },
       {

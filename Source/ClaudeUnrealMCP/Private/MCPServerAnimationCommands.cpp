@@ -31,6 +31,7 @@
 #include "EditorAnimUtils.h"
 #include "Animation/AnimationAsset.h"
 #include "AnimPose.h"
+#include "AnimationBlueprintLibrary.h"
 
 // ===== MONTAGE =====
 
@@ -619,5 +620,54 @@ FString FMCPServer::HandleCompareAnimBonePose(const TSharedPtr<FJsonObject>& Par
 	Data->SetObjectField(TEXT("pose_a"), SerializeTransform(TransformA));
 	Data->SetObjectField(TEXT("pose_b"), SerializeTransform(TransformB));
 	Data->SetObjectField(TEXT("delta_b_relative_to_a"), SerializeTransform(DeltaBRelativeToA));
+	return MakeResponse(true, Data);
+}
+
+// Authors a float curve (constant or keyed) directly onto an AnimSequence -
+// e.g. ALS's Enable_HandIK_L/Layering_Arm_L curves, which gate the AnimGraph's
+// support-hand IK (see HandIK graph in ALS_AnimBP) but are never present on
+// animations retargeted from a project that doesn't use ALS's curve
+// conventions, silently leaving that IK system inactive. Wraps
+// UAnimationBlueprintLibrary::AddCurve/AddFloatCurveKeys - the curve name
+// must already exist in the target Skeleton's curve metadata (check via
+// inspect_asset on the Skeleton) for the AnimGraph's GetCurveValue lookups to
+// actually see it.
+FString FMCPServer::HandleSetAnimCurveKeys(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString AnimPath, CurveName;
+	if (!Params->TryGetStringField(TEXT("anim_path"), AnimPath))
+		return MakeError(TEXT("anim_path required"));
+	if (!Params->TryGetStringField(TEXT("curve_name"), CurveName))
+		return MakeError(TEXT("curve_name required"));
+
+	const TArray<TSharedPtr<FJsonValue>>* TimesArray = nullptr;
+	const TArray<TSharedPtr<FJsonValue>>* ValuesArray = nullptr;
+	if (!Params->TryGetArrayField(TEXT("times"), TimesArray) || !TimesArray)
+		return MakeError(TEXT("times required (array of floats, seconds)"));
+	if (!Params->TryGetArrayField(TEXT("values"), ValuesArray) || !ValuesArray)
+		return MakeError(TEXT("values required (array of floats, same length as times)"));
+	if (TimesArray->Num() != ValuesArray->Num() || TimesArray->Num() == 0)
+		return MakeError(TEXT("times and values must be non-empty and the same length"));
+
+	UAnimSequenceBase* Anim = LoadObject<UAnimSequenceBase>(nullptr, *AnimPath);
+	if (!Anim)
+		return MakeError(FString::Printf(TEXT("Animation not found: %s"), *AnimPath));
+
+	TArray<float> Times, Values;
+	for (const TSharedPtr<FJsonValue>& V : *TimesArray) Times.Add(static_cast<float>(V->AsNumber()));
+	for (const TSharedPtr<FJsonValue>& V : *ValuesArray) Values.Add(static_cast<float>(V->AsNumber()));
+
+	const FName CurveFName(*CurveName);
+	UAnimationBlueprintLibrary::AddCurve(Anim, CurveFName, ERawCurveTrackTypes::RCT_Float, false);
+	UAnimationBlueprintLibrary::AddFloatCurveKeys(Anim, CurveFName, Times, Values);
+
+	UEditorAssetLibrary::SaveAsset(AnimPath, false);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("anim_path"), AnimPath);
+	Data->SetStringField(TEXT("curve_name"), CurveName);
+	Data->SetNumberField(TEXT("key_count"), Times.Num());
 	return MakeResponse(true, Data);
 }

@@ -211,7 +211,16 @@ FString FMCPServer::HandleSaveAsset(const TSharedPtr<FJsonObject>& Params)
 		return MakeError(TEXT("Could not get package"));
 	}
 
-	FString PackageFileName = FPackageName::LongPackageNameToFilename(Package->GetName(), FPackageName::GetAssetPackageExtension());
+	// A level/world package must be saved as .umap, not .uasset - using the
+	// asset extension unconditionally here silently wrote every level save
+	// to a stray, wrongly-named .uasset file sitting next to the real .umap,
+	// which the editor never actually loads on next launch. This was the
+	// real cause of a long-standing "level-placed actors revert after
+	// relaunch" bug misdiagnosed twice before (as a stale autosave, then as
+	// an async SavePackage flush race) - neither was it; save_asset was
+	// just writing to the wrong file the entire time.
+	const FString Extension = Package->ContainsMap() ? FPackageName::GetMapPackageExtension() : FPackageName::GetAssetPackageExtension();
+	FString PackageFileName = FPackageName::LongPackageNameToFilename(Package->GetName(), Extension);
 
 	FSavePackageArgs SaveArgs;
 	SaveArgs.TopLevelFlags = RF_Standalone;
@@ -259,7 +268,9 @@ FString FMCPServer::HandleSaveAll(const TSharedPtr<FJsonObject>& Params)
 			continue;
 		}
 
-		FString PackageFileName = FPackageName::LongPackageNameToFilename(PackageName, FPackageName::GetAssetPackageExtension());
+		// Same map-vs-asset extension fix as HandleSaveAsset above.
+		const FString Extension = Package->ContainsMap() ? FPackageName::GetMapPackageExtension() : FPackageName::GetAssetPackageExtension();
+		FString PackageFileName = FPackageName::LongPackageNameToFilename(PackageName, Extension);
 
 		FSavePackageArgs SaveArgs;
 		SaveArgs.TopLevelFlags = RF_Standalone;

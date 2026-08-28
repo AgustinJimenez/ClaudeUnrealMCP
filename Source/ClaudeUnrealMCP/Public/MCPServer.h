@@ -148,6 +148,7 @@ private:
 	FString HandleCompareAnimBonePose(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetAnimCurveKeys(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetAnimNotifyProperty(const TSharedPtr<FJsonObject>& Params);
+	FString HandleImportTexture(const TSharedPtr<FJsonObject>& Params);
 	FString HandleMoveActor(const TSharedPtr<FJsonObject>& Params);
 
 	// State Trees + Audio + Landscape (Sprint 24-26)

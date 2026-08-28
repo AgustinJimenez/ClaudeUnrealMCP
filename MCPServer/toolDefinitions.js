@@ -2373,6 +2373,19 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "import_texture",
+        description: "Import an image file (jpg/png/tga/etc.) from disk as a Texture2D, via UTextureFactory's legacy synchronous FactoryCreateBinary API - deliberately bypasses AssetTools.import_asset_tasks/Interchange, which crashes the editor when called from this MCP's own command-handling context (a TaskGraph recursion assertion - see AGENTS.md). Use this for any scripted texture import instead of the Python AssetTools path.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            image_path: { type: "string", description: "Absolute path to the image file on disk" },
+            destination_path: { type: "string", description: "Destination content folder, e.g. '/Game/ALSHost/Props/MedKit'" },
+            asset_name: { type: "string", description: "Optional asset name override (default: the file's base name)" },
+          },
+          required: ["image_path", "destination_path"],
+        },
+      },
+      {
         name: "move_actor",
         description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
         inputSchema: {

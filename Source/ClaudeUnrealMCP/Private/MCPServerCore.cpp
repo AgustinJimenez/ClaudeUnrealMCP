@@ -391,6 +391,7 @@ FString FMCPServer::ProcessCommand(const TSharedPtr<FJsonObject>& JsonCommand)
 		{TEXT("retarget_anim_asset"), &FMCPServer::HandleRetargetAnimAsset},
 		{TEXT("compare_anim_bone_pose"), &FMCPServer::HandleCompareAnimBonePose},
 		{TEXT("set_anim_curve_keys"), &FMCPServer::HandleSetAnimCurveKeys},
+		{TEXT("set_anim_notify_property"), &FMCPServer::HandleSetAnimNotifyProperty},
 		{TEXT("setup_fp_spine_pitch_abp"), &FMCPServer::HandleSetupFpSpinePitchAbp},
 		{TEXT("create_state_tree"), &FMCPServer::HandleCreateStateTree},
 		{TEXT("create_sound_cue"), &FMCPServer::HandleCreateSoundCue},

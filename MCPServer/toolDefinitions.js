@@ -2358,6 +2358,21 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "set_anim_notify_property",
+        description: "Sets a property on every AnimNotify/AnimNotifyState instance of a given class found within AnimSequence/AnimMontage assets under path_filter, then saves each modified asset. The raw Notifies array on an AnimSequence is blocked from Python's generic reflection ('protected and cannot be read'), so this is the only way to bulk-edit per-anim notify instance properties (e.g. wiring UALSAnimNotifyFootstep::HitDataTable across every locomotion animation that already has footstep notifies placed) without hand-editing each animation in the editor.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            path_filter: { type: "string", description: "Folder to scan for AnimSequence/AnimMontage assets, e.g. '/ALSV4_CPP'" },
+            notify_class_name: { type: "string", description: "Notify class name to match (UAnimNotify or UAnimNotifyState subclass), e.g. 'ALSAnimNotifyFootstep'" },
+            property_name: { type: "string", description: "Property name to set on each matching notify instance" },
+            property_value: { type: "string", description: "Value to set (as text; for object references, use the full asset path)" },
+            recursive: { type: "boolean", description: "Search subfolders too (default true)" },
+          },
+          required: ["path_filter", "notify_class_name", "property_name", "property_value"],
+        },
+      },
+      {
         name: "move_actor",
         description: "Set any supplied transform fields on an existing level actor while preserving omitted fields. Wrapped in an undo transaction.",
         inputSchema: {

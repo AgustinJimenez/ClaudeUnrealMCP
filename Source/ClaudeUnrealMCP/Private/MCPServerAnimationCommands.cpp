@@ -32,6 +32,7 @@
 #include "Animation/AnimationAsset.h"
 #include "AnimPose.h"
 #include "AnimationBlueprintLibrary.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 
 // ===== MONTAGE =====
 
@@ -289,6 +290,115 @@ FString FMCPServer::HandleReadAnimSequence(const TSharedPtr<FJsonObject>& Params
 		Data->SetNumberField(TEXT("num_frames"), Seq->GetNumberOfSampledKeys());
 	}
 
+	return MakeResponse(true, Data);
+}
+
+// Sets a property on every AnimNotify/AnimNotifyState instance of a given
+// class found within AnimSequence/AnimMontage assets under path_filter -
+// the Notifies array's element objects are individually-editable per-anim
+// instances, and the raw Notifies property is blocked from Python's generic
+// reflection (see AGENTS.md's "protected and cannot be read" family of
+// gotchas), so this can only be done from native C++. Built specifically to
+// bulk-wire UALSAnimNotifyFootstep::HitDataTable across every ALS-Community
+// locomotion animation in one call instead of needing a per-notify tool.
+FString FMCPServer::HandleSetAnimNotifyProperty(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString PathFilter, NotifyClassName, PropertyName, PropertyValue;
+	if (!Params->TryGetStringField(TEXT("path_filter"), PathFilter))
+		return MakeError(TEXT("path_filter required (e.g. /ALSV4_CPP)"));
+	if (!Params->TryGetStringField(TEXT("notify_class_name"), NotifyClassName))
+		return MakeError(TEXT("notify_class_name required (e.g. ALSAnimNotifyFootstep)"));
+	if (!Params->TryGetStringField(TEXT("property_name"), PropertyName))
+		return MakeError(TEXT("property_name required"));
+	if (!Params->TryGetStringField(TEXT("property_value"), PropertyValue))
+		return MakeError(TEXT("property_value required"));
+
+	bool bRecursive = true;
+	Params->TryGetBoolField(TEXT("recursive"), bRecursive);
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+	TArray<FAssetData> FolderAssets;
+	AssetRegistry.GetAssetsByPath(FName(*PathFilter), FolderAssets, bRecursive);
+
+	TArray<TSharedPtr<FJsonValue>> TouchedAssets;
+	int32 NotifyCount = 0;
+
+	for (const FAssetData& AssetDataEntry : FolderAssets)
+	{
+		UObject* Asset = AssetDataEntry.GetAsset();
+		UAnimSequenceBase* AnimSeq = Cast<UAnimSequenceBase>(Asset);
+		if (!AnimSeq)
+			continue;
+
+		bool bModifiedThisAsset = false;
+
+		for (FAnimNotifyEvent& NotifyEvent : AnimSeq->Notifies)
+		{
+			UObject* NotifyObject = nullptr;
+			if (NotifyEvent.Notify && NotifyEvent.Notify->GetClass()->GetName() == NotifyClassName)
+			{
+				NotifyObject = NotifyEvent.Notify;
+			}
+			else if (NotifyEvent.NotifyStateClass.Get() && NotifyEvent.NotifyStateClass.Get()->GetClass()->GetName() == NotifyClassName)
+			{
+				NotifyObject = NotifyEvent.NotifyStateClass.Get();
+			}
+
+			if (!NotifyObject)
+				continue;
+
+			FProperty* Property = NotifyObject->GetClass()->FindPropertyByName(*PropertyName);
+			if (!Property)
+				continue;
+
+			if (FClassProperty* ClassProp = CastField<FClassProperty>(Property))
+			{
+				UObject* Loaded = LoadObject<UObject>(nullptr, *PropertyValue);
+				UClass* ResolvedClass = Cast<UClass>(Loaded);
+				if (!ResolvedClass)
+				{
+					if (UBlueprint* ReferencedBlueprint = Cast<UBlueprint>(Loaded))
+					{
+						ResolvedClass = ReferencedBlueprint->GeneratedClass;
+					}
+				}
+				if (!ResolvedClass)
+					continue;
+				ClassProp->SetObjectPropertyValue(ClassProp->ContainerPtrToValuePtr<void>(NotifyObject), ResolvedClass);
+			}
+			else if (FObjectProperty* ObjProp = CastField<FObjectProperty>(Property))
+			{
+				UObject* ReferencedObject = LoadObject<UObject>(nullptr, *PropertyValue);
+				if (!ReferencedObject)
+					continue;
+				ObjProp->SetObjectPropertyValue(ObjProp->ContainerPtrToValuePtr<void>(NotifyObject), ReferencedObject);
+			}
+			else
+			{
+				void* ValuePtr = Property->ContainerPtrToValuePtr<void>(NotifyObject);
+				if (!Property->ImportText_Direct(*PropertyValue, ValuePtr, NotifyObject, PPF_None))
+					continue;
+			}
+
+			NotifyCount++;
+			bModifiedThisAsset = true;
+		}
+
+		if (bModifiedThisAsset)
+		{
+			AnimSeq->MarkPackageDirty();
+			UEditorAssetLibrary::SaveAsset(AssetDataEntry.GetObjectPathString(), false);
+			TouchedAssets.Add(MakeShared<FJsonValueString>(AssetDataEntry.GetObjectPathString()));
+		}
+	}
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetNumberField(TEXT("notify_count"), NotifyCount);
+	Data->SetArrayField(TEXT("touched_assets"), TouchedAssets);
 	return MakeResponse(true, Data);
 }
 

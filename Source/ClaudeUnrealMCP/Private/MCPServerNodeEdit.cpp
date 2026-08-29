@@ -28,6 +28,8 @@
 #include "K2Node_SetFieldsInStruct.h"
 #include "K2Node_BreakStruct.h"
 #include "StructUtils/InstancedStruct.h"
+#include "EdGraphSchema_K2.h"
+#include "UObject/UObjectGlobals.h"
 #include "K2Node_MakeStruct.h"
 #include "K2Node_SwitchEnum.h"
 #include "K2Node_CastByteToEnum.h"
@@ -387,8 +389,53 @@ FString FMCPServer::HandleSetPinDefault(const TSharedPtr<FJsonObject>& Params)
 			{
 				if (Pin->PinName.ToString() == PinName)
 				{
-					FString OldDefault = Pin->DefaultValue;
-					Pin->DefaultValue = NewDefault;
+					// Object/class-reference pins (e.g. a StaticMesh* function
+					// param) resolve their compiled default from
+					// Pin->DefaultObject, not Pin->DefaultValue - writing only
+					// DefaultValue (the old behavior) left the pin's real
+					// value untouched, so the graph kept compiling against
+					// whatever object was already assigned. Discovered live:
+					// re-pointing ALS_CharacterBP's OnUpdateHeldObject "Torch"
+					// AttachToHand call at a different StaticMesh appeared to
+					// succeed but compilation kept citing the original mesh.
+					const bool bIsObjectPin = Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Object
+						|| Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_SoftObject
+						|| Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Class
+						|| Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_SoftClass;
+
+					FString OldDefault = bIsObjectPin
+						? (Pin->DefaultObject ? Pin->DefaultObject->GetPathName() : FString())
+						: Pin->DefaultValue;
+
+					if (bIsObjectPin)
+					{
+						// Accept either a bare asset path or the
+						// ClassName'/Path/To/Asset.Asset' decorated form
+						// ImportText/read_function_graphs displays.
+						FString AssetPath = NewDefault;
+						int32 QuoteIdx;
+						if (!AssetPath.IsEmpty() && AssetPath.EndsWith(TEXT("'")) && AssetPath.FindChar('\'', QuoteIdx))
+						{
+							AssetPath = AssetPath.Mid(QuoteIdx + 1, AssetPath.Len() - QuoteIdx - 2);
+						}
+
+						UObject* ResolvedObject = nullptr;
+						if (!AssetPath.IsEmpty())
+						{
+							ResolvedObject = StaticLoadObject(UObject::StaticClass(), nullptr, *AssetPath);
+							if (!ResolvedObject)
+							{
+								return MakeError(FString::Printf(TEXT("Could not resolve object '%s' for pin '%s'"), *AssetPath, *PinName));
+							}
+						}
+
+						Pin->DefaultObject = ResolvedObject;
+						Pin->DefaultValue.Empty();
+					}
+					else
+					{
+						Pin->DefaultValue = NewDefault;
+					}
 
 					FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 

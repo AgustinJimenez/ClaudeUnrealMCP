@@ -52,6 +52,13 @@
 #include "UObject/SavePackage.h"
 #include "InputAction.h"
 #include "InputMappingContext.h"
+#include "LevelEditor.h"
+#include "LevelEditorViewport.h"
+#include "SLevelViewport.h"
+#include "ImageUtils.h"
+#include "Misc/FileHelper.h"
+#include "UnrealClient.h"
+#include "RenderingThread.h"
 #include "EnhancedInputComponent.h"
 #include "Components/ActorComponent.h"
 #include "Kismet2/ComponentEditorUtils.h"
@@ -176,16 +183,59 @@ FString FMCPServer::HandleCaptureScreenshot(const TSharedPtr<FJsonObject>& Param
 	// Construct full file path
 	FString FullPath = FPaths::Combine(ScreenshotDir, TimestampedFilename + TEXT(".png"));
 
-	// Request screenshot - this captures the active viewport
-	FScreenshotRequest::RequestScreenshot(FullPath, false, false);
+	// FScreenshotRequest::RequestScreenshot() only queues a request - the actual capture and PNG
+	// write happen asynchronously on a later frame/thread, with no signal back to this handler, so
+	// the file frequently doesn't exist yet by the time we'd return. Instead, read the viewport's
+	// rendered pixels back synchronously (FViewport::ReadPixels flushes rendering commands
+	// internally) and encode/write the PNG ourselves on this thread before responding.
+	FLevelEditorModule& LevelEditorModule = FModuleManager::GetModuleChecked<FLevelEditorModule>("LevelEditor");
+	TSharedPtr<SLevelViewport> ActiveViewport = LevelEditorModule.GetFirstActiveLevelViewport();
+	if (!ActiveViewport.IsValid())
+	{
+		return MakeError(TEXT("No active level viewport available to capture"));
+	}
 
-	// Note: Screenshot is captured asynchronously, but the file should be written very quickly
-	// We'll return immediately with the expected path
+	FLevelEditorViewportClient& ViewportClient = ActiveViewport->GetLevelViewportClient();
+	FViewport* TargetViewport = ViewportClient.Viewport;
+	if (!TargetViewport)
+	{
+		return MakeError(TEXT("Active level viewport has no renderable FViewport"));
+	}
+
+	// Force a fresh frame so we don't capture a stale buffer from before the last edit.
+	TargetViewport->Draw();
+	FlushRenderingCommands();
+
+	TArray<FColor> Bitmap;
+	const FIntPoint ViewportSize = TargetViewport->GetSizeXY();
+	const FIntRect ViewRect(0, 0, ViewportSize.X, ViewportSize.Y);
+	if (!TargetViewport->ReadPixels(Bitmap, FReadSurfaceDataFlags(), ViewRect) || Bitmap.Num() == 0)
+	{
+		return MakeError(TEXT("Failed to read pixels from the active viewport"));
+	}
+
+	// Viewport reads commonly come back with A=0 (no alpha channel rendered), which would encode
+	// as a fully transparent PNG - force opaque so the image is actually visible.
+	for (FColor& Pixel : Bitmap)
+	{
+		Pixel.A = 255;
+	}
+
+	TArray64<uint8> CompressedPNG;
+	FImageView ImageView(Bitmap.GetData(), ViewRect.Width(), ViewRect.Height());
+	FImageUtils::CompressImage(CompressedPNG, TEXT("PNG"), ImageView);
+
+	if (CompressedPNG.Num() == 0 || !FFileHelper::SaveArrayToFile(CompressedPNG, *FullPath))
+	{
+		return MakeError(FString::Printf(TEXT("Failed to write screenshot file: %s"), *FullPath));
+	}
 
 	TSharedPtr<FJsonObject> ResponseData = MakeShared<FJsonObject>();
 	ResponseData->SetStringField(TEXT("message"), TEXT("Screenshot captured successfully"));
 	ResponseData->SetStringField(TEXT("path"), FullPath);
 	ResponseData->SetStringField(TEXT("filename"), TimestampedFilename + TEXT(".png"));
+	ResponseData->SetNumberField(TEXT("width"), ViewRect.Width());
+	ResponseData->SetNumberField(TEXT("height"), ViewRect.Height());
 
 	return MakeResponse(true, ResponseData);
 }

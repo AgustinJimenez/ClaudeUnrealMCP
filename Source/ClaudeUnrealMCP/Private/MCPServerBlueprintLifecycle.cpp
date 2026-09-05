@@ -32,6 +32,9 @@
 #include "K2Node_SwitchEnum.h"
 #include "K2Node_CastByteToEnum.h"
 #include "K2Node_Select.h"
+#include "Editor.h"
+#include "TimerManager.h"
+#include "HAL/PlatformMisc.h"
 #include "K2Node_Message.h"
 #include "EdGraphSchema_K2.h"
 #include "StructUtils/UserDefinedStruct.h"
@@ -309,6 +312,34 @@ FString FMCPServer::HandleSaveAll(const TSharedPtr<FJsonObject>& Params)
 		return MakeResponse(false, Data, Message);
 	}
 
+	return MakeResponse(true, Data);
+}
+
+FString FMCPServer::HandleSaveAllAndClose(const TSharedPtr<FJsonObject>& Params)
+{
+	// Reuse HandleSaveAll's own logic (including the map-vs-asset extension fix noted above)
+	// rather than duplicating the dirty-package walk here.
+	const FString SaveResultJson = HandleSaveAll(Params);
+
+	// Defer the actual exit to the next tick so this response has a chance to reach the client
+	// over the socket before the process goes away - requesting exit synchronously here could
+	// tear the process down before the send completes.
+	if (GEditor)
+	{
+		GEditor->GetTimerManager()->SetTimerForNextTick([]()
+		{
+			FGenericPlatformMisc::RequestExit(false);
+		});
+	}
+	else
+	{
+		FGenericPlatformMisc::RequestExit(false);
+	}
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("save_result"), SaveResultJson);
+	Data->SetBoolField(TEXT("closing"), true);
+	Data->SetStringField(TEXT("message"), TEXT("Saved all dirty packages; editor is now closing"));
 	return MakeResponse(true, Data);
 }
 

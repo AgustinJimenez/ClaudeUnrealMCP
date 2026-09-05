@@ -423,6 +423,7 @@ FString FMCPServer::ProcessCommand(const TSharedPtr<FJsonObject>& JsonCommand)
 		{TEXT("get_engine_version"), &FMCPServer::HandleGetEngineVersion},
 		{TEXT("set_viewport_camera"), &FMCPServer::HandleSetViewportCamera},
 		{TEXT("open_asset"), &FMCPServer::HandleOpenAsset},
+		{TEXT("save_all_and_close"), &FMCPServer::HandleSaveAllAndClose},
 		{TEXT("create_behavior_tree"), &FMCPServer::HandleCreateBehaviorTree},
 		{TEXT("create_blackboard"), &FMCPServer::HandleCreateBlackboard},
 		{TEXT("add_blackboard_key"), &FMCPServer::HandleAddBlackboardKey},

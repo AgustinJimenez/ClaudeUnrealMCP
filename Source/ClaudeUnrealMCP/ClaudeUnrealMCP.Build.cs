@@ -52,7 +52,8 @@ public class ClaudeUnrealMCP : ModuleRules
 			"AnimGraph",  // For UAnimGraphNode_ModifyBone, AnimGraph editor nodes
 			"AnimGraphRuntime",  // For FAnimNode_ModifyBone runtime structs
 			"SkeletonEditor",  // For IEditableSkeleton::AddSocket/RenameSocket
-			"AnimationBlueprintLibrary"  // For UAnimPoseExtensions::GetAnimPoseAtTime/GetBonePose
+			"AnimationBlueprintLibrary",  // For UAnimPoseExtensions::GetAnimPoseAtTime/GetBonePose
+			"RenderCore"  // For FlushRenderingCommands (synchronous screenshot capture)
 		});
 	}
 }

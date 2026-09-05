@@ -193,6 +193,7 @@ private:
 	FString HandleGetEngineVersion(const TSharedPtr<FJsonObject>& Params);
 	FString HandleSetViewportCamera(const TSharedPtr<FJsonObject>& Params);
 	FString HandleOpenAsset(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSaveAllAndClose(const TSharedPtr<FJsonObject>& Params);
 
 	// Behavior Tree (Sprint 14)
 	FString HandleCreateBehaviorTree(const TSharedPtr<FJsonObject>& Params);

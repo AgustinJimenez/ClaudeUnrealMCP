@@ -2238,6 +2238,14 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "save_all_and_close",
+        description: "Save all modified assets in the project, then cleanly close the Unreal Editor. The connection will drop once the editor exits - relaunch the editor process externally to reconnect.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
+      {
         name: "create_anim_blueprint",
         description: "Create an Animation Blueprint for a skeleton and save it to the project.",
         inputSchema: {

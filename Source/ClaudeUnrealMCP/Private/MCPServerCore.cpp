@@ -395,6 +395,8 @@ FString FMCPServer::ProcessCommand(const TSharedPtr<FJsonObject>& JsonCommand)
 		{TEXT("read_state_machine"), &FMCPServer::HandleReadStateMachine},
 		{TEXT("duplicate_state_transition"), &FMCPServer::HandleDuplicateStateTransition},
 		{TEXT("add_enum_or_condition_to_transition_rule"), &FMCPServer::HandleAddEnumOrConditionToTransitionRule},
+		{TEXT("add_static_mesh_socket"), &FMCPServer::HandleAddStaticMeshSocket},
+		{TEXT("list_static_mesh_sockets"), &FMCPServer::HandleListStaticMeshSockets},
 		{TEXT("import_texture"), &FMCPServer::HandleImportTexture},
 		{TEXT("setup_fp_spine_pitch_abp"), &FMCPServer::HandleSetupFpSpinePitchAbp},
 		{TEXT("create_state_tree"), &FMCPServer::HandleCreateStateTree},

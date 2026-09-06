@@ -2427,6 +2427,35 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "add_static_mesh_socket",
+        description: "Adds a mesh-level socket (UStaticMeshSocket) to a StaticMesh asset, with an explicit local location/rotation. Used for the held-weapon 'Grip' socket convention: AttachToHand auto-aligns this socket to the hand bone when present, so a weapon mesh needs no per-weapon hardcoded offset tuning in Blueprint. Fails if a socket with that name already exists (delete it in the editor first, or pick a new name).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mesh_path: { type: "string", description: "Full path to the StaticMesh asset, e.g. '/Game/ALSHost/Weapons/Melee/SM_Sword'" },
+            socket_name: { type: "string", description: "Name for the new socket, e.g. 'Grip'" },
+            x: { type: "number", description: "Local location X (default 0)" },
+            y: { type: "number", description: "Local location Y (default 0)" },
+            z: { type: "number", description: "Local location Z (default 0)" },
+            pitch: { type: "number", description: "Local rotation pitch in degrees (default 0)" },
+            yaw: { type: "number", description: "Local rotation yaw in degrees (default 0)" },
+            roll: { type: "number", description: "Local rotation roll in degrees (default 0)" },
+          },
+          required: ["mesh_path", "socket_name"],
+        },
+      },
+      {
+        name: "list_static_mesh_sockets",
+        description: "Lists all mesh-level sockets (UStaticMeshSocket) on a StaticMesh asset, with their local location/rotation/scale.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mesh_path: { type: "string", description: "Full path to the StaticMesh asset" },
+          },
+          required: ["mesh_path"],
+        },
+      },
+      {
         name: "import_texture",
         description: "Import an image file (jpg/png/tga/etc.) from disk as a Texture2D, via UTextureFactory's legacy synchronous FactoryCreateBinary API - deliberately bypasses AssetTools.import_asset_tasks/Interchange, which crashes the editor when called from this MCP's own command-handling context (a TaskGraph recursion assertion - see AGENTS.md). Use this for any scripted texture import instead of the Python AssetTools path.",
         inputSchema: {

@@ -33,6 +33,18 @@
 #include "AnimPose.h"
 #include "AnimationBlueprintLibrary.h"
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Engine/Blueprint.h"
+#include "AnimGraphNode_StateMachine.h"
+#include "AnimationStateMachineGraph.h"
+#include "AnimStateNode.h"
+#include "AnimStateNodeBase.h"
+#include "AnimStateEntryNode.h"
+#include "AnimStateTransitionNode.h"
+#include "EdGraph/EdGraphPin.h"
+#include "K2Node_CallFunction.h"
+#include "K2Node_BreakStruct.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "MCPServerHelpers.h"
 
 // ===== MONTAGE =====
 
@@ -779,5 +791,438 @@ FString FMCPServer::HandleSetAnimCurveKeys(const TSharedPtr<FJsonObject>& Params
 	Data->SetStringField(TEXT("anim_path"), AnimPath);
 	Data->SetStringField(TEXT("curve_name"), CurveName);
 	Data->SetNumberField(TEXT("key_count"), Times.Num());
+	return MakeResponse(true, Data);
+}
+
+// ===== ANIMGRAPH STATE MACHINES =====
+//
+// AnimGraph state machine sub-graphs (the states/transitions nested inside an
+// AnimGraphNode_StateMachine node) are invisible to read_function_graphs/
+// read_event_graph_detailed - those only walk Blueprint->FunctionGraphs/
+// UbergraphPages directly, and a state machine's UAnimationStateMachineGraph
+// is reached only via the containing AnimGraphNode_StateMachine's own
+// EditorStateMachineGraph property (not a generically-reflected sub-graph
+// list). See AGENTS.md's "AnimGraph state machines aren't in FunctionGraphs/
+// UbergraphPages" entry. Built to inspect ALS_AnimBP's "Overlay States"
+// machine (in the OverlayLayer anim layer function) when adding a new
+// EALSOverlayState value (Sword) that needs to reuse an existing state's
+// (Torch's) pose - no way to see what's actually wired there otherwise.
+
+static UAnimGraphNode_StateMachine* FindStateMachineNode(UEdGraph* ContainerGraph, const FString& NodeNameFilter)
+{
+	for (UEdGraphNode* Node : ContainerGraph->Nodes)
+	{
+		UAnimGraphNode_StateMachine* SMNode = Cast<UAnimGraphNode_StateMachine>(Node);
+		if (!SMNode) continue;
+		if (NodeNameFilter.IsEmpty()) return SMNode;
+		if (SMNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString().Contains(NodeNameFilter)) return SMNode;
+		if (SMNode->EditorStateMachineGraph && SMNode->EditorStateMachineGraph->GetName().Contains(NodeNameFilter)) return SMNode;
+	}
+	return nullptr;
+}
+
+// Briefly summarizes a transition rule's BoundGraph (a small K2 graph
+// returning a bool) - specifically pulls out any Equal/NotEqual comparison
+// against a literal byte/enum value, which is ALS's actual pattern for
+// "OverlayState == SomeValue" gating. Falls back to a generic node/pin dump
+// for anything more complex so nothing is silently hidden.
+static TSharedPtr<FJsonObject> SummarizeTransitionRule(UEdGraph* RuleGraph)
+{
+	TSharedPtr<FJsonObject> RuleObj = MakeShared<FJsonObject>();
+	if (!RuleGraph)
+	{
+		RuleObj->SetBoolField(TEXT("has_rule_graph"), false);
+		return RuleObj;
+	}
+	RuleObj->SetBoolField(TEXT("has_rule_graph"), true);
+
+	TArray<TSharedPtr<FJsonValue>> NodesArray;
+	for (UEdGraphNode* RNode : RuleGraph->Nodes)
+	{
+		if (!RNode) continue;
+		TSharedPtr<FJsonObject> RN = MakeShared<FJsonObject>();
+		RN->SetStringField(TEXT("node_guid"), RNode->NodeGuid.ToString());
+		RN->SetStringField(TEXT("class"), RNode->GetClass()->GetName());
+		RN->SetStringField(TEXT("title"), RNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+
+		if (UK2Node_CallFunction* FuncNode = Cast<UK2Node_CallFunction>(RNode))
+		{
+			RN->SetStringField(TEXT("function_name"), FuncNode->GetFunctionName().ToString());
+		}
+
+		TArray<TSharedPtr<FJsonValue>> PinsArray;
+		for (UEdGraphPin* Pin : RNode->Pins)
+		{
+			if (!Pin) continue;
+			TSharedPtr<FJsonObject> PinObj = MakeShared<FJsonObject>();
+			PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
+			PinObj->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("Input") : TEXT("Output"));
+			if (!Pin->DefaultValue.IsEmpty()) PinObj->SetStringField(TEXT("default_value"), Pin->DefaultValue);
+			if (Pin->DefaultObject) PinObj->SetStringField(TEXT("default_object"), Pin->DefaultObject->GetPathName());
+			PinObj->SetBoolField(TEXT("is_linked"), Pin->LinkedTo.Num() > 0);
+			TArray<TSharedPtr<FJsonValue>> LinkedFrom;
+			for (UEdGraphPin* Linked : Pin->LinkedTo)
+			{
+				if (!Linked || !Linked->GetOwningNode()) continue;
+				TSharedPtr<FJsonObject> L = MakeShared<FJsonObject>();
+				L->SetStringField(TEXT("node_guid"), Linked->GetOwningNode()->NodeGuid.ToString());
+				L->SetStringField(TEXT("pin_name"), Linked->PinName.ToString());
+				LinkedFrom.Add(MakeShared<FJsonValueObject>(L));
+			}
+			if (LinkedFrom.Num() > 0) PinObj->SetArrayField(TEXT("linked_to"), LinkedFrom);
+			PinsArray.Add(MakeShared<FJsonValueObject>(PinObj));
+		}
+		RN->SetArrayField(TEXT("pins"), PinsArray);
+		NodesArray.Add(MakeShared<FJsonValueObject>(RN));
+	}
+	RuleObj->SetArrayField(TEXT("nodes"), NodesArray);
+	return RuleObj;
+}
+
+// Reads a state machine's states and transitions, since no existing tool can
+// see past the containing AnimGraphNode_StateMachine node (see comment
+// above). blueprint_path + graph_name locate the function graph holding the
+// state machine node (e.g. an Anim Layer function like "OverlayLayer");
+// state_machine_node_name matches against the node's title or its bound
+// graph's own name (e.g. "Overlay States").
+FString FMCPServer::HandleReadStateMachine(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString Path, GraphName, NodeNameFilter;
+	if (!Params->TryGetStringField(TEXT("blueprint_path"), Path))
+		return MakeError(TEXT("blueprint_path required"));
+	if (!Params->TryGetStringField(TEXT("graph_name"), GraphName))
+		return MakeError(TEXT("graph_name required (the function graph containing the state machine node, e.g. an Anim Layer function name)"));
+	Params->TryGetStringField(TEXT("state_machine_node_name"), NodeNameFilter);
+
+	UBlueprint* Blueprint = LoadBlueprintFromPath(Path);
+	if (!Blueprint)
+		return MakeError(FString::Printf(TEXT("Blueprint not found: %s"), *Path));
+
+	UEdGraph* ContainerGraph = nullptr;
+	for (UEdGraph* G : Blueprint->FunctionGraphs)
+	{
+		if (G && G->GetName() == GraphName) { ContainerGraph = G; break; }
+	}
+	if (!ContainerGraph)
+	{
+		for (const FBPInterfaceDescription& Interface : Blueprint->ImplementedInterfaces)
+		{
+			for (UEdGraph* G : Interface.Graphs)
+			{
+				if (G && G->GetName() == GraphName) { ContainerGraph = G; break; }
+			}
+			if (ContainerGraph) break;
+		}
+	}
+	if (!ContainerGraph)
+		return MakeError(FString::Printf(TEXT("Function graph not found: %s"), *GraphName));
+
+	UAnimGraphNode_StateMachine* SMNode = FindStateMachineNode(ContainerGraph, NodeNameFilter);
+	if (!SMNode)
+		return MakeError(FString::Printf(TEXT("State machine node not found in graph '%s' (filter: '%s')"), *GraphName, *NodeNameFilter));
+	if (!SMNode->EditorStateMachineGraph)
+		return MakeError(TEXT("State machine node has no EditorStateMachineGraph"));
+
+	UAnimationStateMachineGraph* SMGraph = SMNode->EditorStateMachineGraph;
+
+	FString EntryStateName;
+	TArray<TSharedPtr<FJsonValue>> StatesArray;
+	TArray<TSharedPtr<FJsonValue>> TransitionsArray;
+
+	for (UEdGraphNode* Node : SMGraph->Nodes)
+	{
+		if (!Node) continue;
+
+		if (UAnimStateEntryNode* EntryNode = Cast<UAnimStateEntryNode>(Node))
+		{
+			for (UEdGraphPin* Pin : EntryNode->Pins)
+			{
+				for (UEdGraphPin* Linked : Pin->LinkedTo)
+				{
+					if (UAnimStateNodeBase* StateBase = Cast<UAnimStateNodeBase>(Linked->GetOwningNode()))
+					{
+						EntryStateName = StateBase->GetStateName();
+					}
+				}
+			}
+		}
+		else if (UAnimStateTransitionNode* Trans = Cast<UAnimStateTransitionNode>(Node))
+		{
+			TSharedPtr<FJsonObject> T = MakeShared<FJsonObject>();
+			T->SetStringField(TEXT("node_guid"), Trans->NodeGuid.ToString());
+			UAnimStateNodeBase* PrevState = Trans->GetPreviousState();
+			UAnimStateNodeBase* NextState = Trans->GetNextState();
+			T->SetStringField(TEXT("from_state"), PrevState ? PrevState->GetStateName() : FString());
+			T->SetStringField(TEXT("to_state"), NextState ? NextState->GetStateName() : FString());
+			T->SetStringField(TEXT("from_state_guid"), PrevState ? Cast<UEdGraphNode>(PrevState)->NodeGuid.ToString() : FString());
+			T->SetStringField(TEXT("to_state_guid"), NextState ? Cast<UEdGraphNode>(NextState)->NodeGuid.ToString() : FString());
+			T->SetObjectField(TEXT("rule"), SummarizeTransitionRule(Trans->BoundGraph));
+			TransitionsArray.Add(MakeShared<FJsonValueObject>(T));
+		}
+		else if (UAnimStateNode* StateNode = Cast<UAnimStateNode>(Node))
+		{
+			TSharedPtr<FJsonObject> S = MakeShared<FJsonObject>();
+			S->SetStringField(TEXT("name"), StateNode->GetStateName());
+			S->SetStringField(TEXT("node_guid"), StateNode->NodeGuid.ToString());
+			StatesArray.Add(MakeShared<FJsonValueObject>(S));
+		}
+	}
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("state_machine_name"), SMGraph->GetName());
+	Data->SetStringField(TEXT("entry_state"), EntryStateName);
+	Data->SetArrayField(TEXT("states"), StatesArray);
+	Data->SetNumberField(TEXT("state_count"), StatesArray.Num());
+	Data->SetArrayField(TEXT("transitions"), TransitionsArray);
+	Data->SetNumberField(TEXT("transition_count"), TransitionsArray.Num());
+	return MakeResponse(true, Data);
+}
+
+// Clones an existing transition (its BoundGraph rule graph included, via the
+// same ExportNodesToText/ImportNodesFromText path Task 3's duplicate_node op
+// uses for regular graph nodes - see AGENTS.md) between two named states in
+// the same state machine, keeping the SOURCE state the same as the original
+// and pointing the new copy's target at a different existing state. Used to
+// give a brand-new enum value (e.g. Sword) an entry transition into an
+// existing state (e.g. Torch) that mirrors whatever condition already lets a
+// known-working value (e.g. the Torch value itself, or whatever the existing
+// From state's transition into Torch already checks) trigger - the actual
+// enum literal inside the cloned rule graph still needs a follow-up
+// set_pin_default call once this returns the new rule graph's node info, the
+// same way Task 3 used set_pin_default after duplicate_node.
+FString FMCPServer::HandleDuplicateStateTransition(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString Path, GraphName, NodeNameFilter, SourceTransitionGuid, NewTargetStateName;
+	if (!Params->TryGetStringField(TEXT("blueprint_path"), Path))
+		return MakeError(TEXT("blueprint_path required"));
+	if (!Params->TryGetStringField(TEXT("graph_name"), GraphName))
+		return MakeError(TEXT("graph_name required"));
+	Params->TryGetStringField(TEXT("state_machine_node_name"), NodeNameFilter);
+	if (!Params->TryGetStringField(TEXT("source_transition_guid"), SourceTransitionGuid))
+		return MakeError(TEXT("source_transition_guid required (from read_state_machine's transitions[].node_guid)"));
+	if (!Params->TryGetStringField(TEXT("new_target_state_name"), NewTargetStateName))
+		return MakeError(TEXT("new_target_state_name required (an existing state's name to point the cloned transition's target at; the source stays the same)"));
+
+	UBlueprint* Blueprint = LoadBlueprintFromPath(Path);
+	if (!Blueprint)
+		return MakeError(FString::Printf(TEXT("Blueprint not found: %s"), *Path));
+
+	UEdGraph* ContainerGraph = nullptr;
+	for (UEdGraph* G : Blueprint->FunctionGraphs)
+	{
+		if (G && G->GetName() == GraphName) { ContainerGraph = G; break; }
+	}
+	if (!ContainerGraph)
+		return MakeError(FString::Printf(TEXT("Function graph not found: %s"), *GraphName));
+
+	UAnimGraphNode_StateMachine* SMNode = FindStateMachineNode(ContainerGraph, NodeNameFilter);
+	if (!SMNode || !SMNode->EditorStateMachineGraph)
+		return MakeError(TEXT("State machine node not found"));
+	UAnimationStateMachineGraph* SMGraph = SMNode->EditorStateMachineGraph;
+
+	FGuid SourceGuid;
+	if (!FGuid::Parse(SourceTransitionGuid, SourceGuid))
+		return MakeError(TEXT("source_transition_guid is not a valid GUID"));
+
+	UAnimStateTransitionNode* SourceTransition = nullptr;
+	UAnimStateNodeBase* NewTargetState = nullptr;
+	for (UEdGraphNode* Node : SMGraph->Nodes)
+	{
+		if (UAnimStateTransitionNode* Trans = Cast<UAnimStateTransitionNode>(Node))
+		{
+			if (Trans->NodeGuid == SourceGuid) SourceTransition = Trans;
+		}
+		else if (UAnimStateNode* StateNode = Cast<UAnimStateNode>(Node))
+		{
+			if (StateNode->GetStateName() == NewTargetStateName) NewTargetState = StateNode;
+		}
+	}
+	if (!SourceTransition)
+		return MakeError(FString::Printf(TEXT("Transition with guid %s not found"), *SourceTransitionGuid));
+	if (!NewTargetState)
+		return MakeError(FString::Printf(TEXT("Target state '%s' not found"), *NewTargetStateName));
+
+	UAnimStateNodeBase* SourceOriginState = SourceTransition->GetPreviousState();
+	if (!SourceOriginState)
+		return MakeError(TEXT("Source transition has no origin state (GetPreviousState returned null)"));
+
+	// Duplicate the transition node itself (copies PriorityOrder/CrossfadeDuration/
+	// BlendMode/etc via the standard duplication path, not a field-by-field manual
+	// copy) and give it a fresh identity before wiring it into the graph.
+	UAnimStateTransitionNode* NewTransition = DuplicateObject<UAnimStateTransitionNode>(SourceTransition, SMGraph);
+	if (!NewTransition)
+		return MakeError(TEXT("Failed to duplicate transition node"));
+	NewTransition->CreateNewGuid();
+	SMGraph->AddNode(NewTransition, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	NewTransition->NodePosX = SourceTransition->NodePosX + 40;
+	NewTransition->NodePosY = SourceTransition->NodePosY + 60;
+
+	// The duplicated BoundGraph rule is a straight UObject copy sharing no
+	// UEdGraphPin links to the outside (transition rule graphs are small,
+	// self-contained bool graphs with no external connections other than
+	// their own Result node), but it still needs its own identity and to be
+	// registered as this node's rule graph rather than aliasing the source's.
+	if (SourceTransition->BoundGraph)
+	{
+		UEdGraph* NewRuleGraph = DuplicateObject<UEdGraph>(SourceTransition->BoundGraph, NewTransition);
+		NewRuleGraph->Rename(nullptr, NewTransition, REN_DontCreateRedirectors);
+		for (UEdGraphNode* RNode : NewRuleGraph->Nodes)
+		{
+			if (RNode) RNode->CreateNewGuid();
+		}
+		NewTransition->BoundGraph = NewRuleGraph;
+	}
+
+	// Clear the copied pin links (duplicated pins still point at the source
+	// transition's neighbors) and reconnect: same origin state as the
+	// source transition, new target state as requested.
+	NewTransition->Pins.Empty();
+	NewTransition->AllocateDefaultPins();
+	NewTransition->CreateConnections(SourceOriginState, NewTargetState);
+
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	UEditorAssetLibrary::SaveAsset(Path, false);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("new_transition_guid"), NewTransition->NodeGuid.ToString());
+	Data->SetStringField(TEXT("from_state"), SourceOriginState->GetStateName());
+	Data->SetStringField(TEXT("to_state"), NewTargetState->GetStateName());
+	Data->SetObjectField(TEXT("rule"), SummarizeTransitionRule(NewTransition->BoundGraph));
+	return MakeResponse(true, Data);
+}
+
+// Widens an existing transition rule from "field X" to "field X OR field Y",
+// where X and Y are two bool output pins on the SAME K2Node_BreakStruct node
+// inside the rule's BoundGraph - this is exactly ALS's own pattern for
+// gating a transition on one FALSOverlayState field (see read_state_machine's
+// output: the "Break ALSOverlay State" node already exposes one bool output
+// pin per struct field, including newly-added ones like "Sword_", left
+// unlinked until a rule chooses to use it). Rewires whatever the existing
+// field's pin was plugged into (directly into a Result node, or through a
+// NOT node, or anything else) to instead come from a new BooleanOR node
+// combining both fields, leaving everything else in the rule graph
+// untouched. Built specifically to let a new EALSOverlayState value (e.g.
+// Sword) share an existing state's (e.g. Torch's) both entry and exit
+// transitions, rather than needing a whole new state/pose.
+FString FMCPServer::HandleAddEnumOrConditionToTransitionRule(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString Path, GraphName, NodeNameFilter, TransitionGuidStr, ExistingPinName, NewPinName;
+	if (!Params->TryGetStringField(TEXT("blueprint_path"), Path))
+		return MakeError(TEXT("blueprint_path required"));
+	if (!Params->TryGetStringField(TEXT("graph_name"), GraphName))
+		return MakeError(TEXT("graph_name required"));
+	Params->TryGetStringField(TEXT("state_machine_node_name"), NodeNameFilter);
+	if (!Params->TryGetStringField(TEXT("transition_guid"), TransitionGuidStr))
+		return MakeError(TEXT("transition_guid required (from read_state_machine's transitions[].node_guid)"));
+	if (!Params->TryGetStringField(TEXT("existing_bool_pin_name"), ExistingPinName))
+		return MakeError(TEXT("existing_bool_pin_name required (the BreakStruct output pin currently driving this rule, e.g. 'Torch_')"));
+	if (!Params->TryGetStringField(TEXT("new_bool_pin_name"), NewPinName))
+		return MakeError(TEXT("new_bool_pin_name required (the BreakStruct output pin to OR in, e.g. 'Sword_')"));
+
+	UBlueprint* Blueprint = LoadBlueprintFromPath(Path);
+	if (!Blueprint)
+		return MakeError(FString::Printf(TEXT("Blueprint not found: %s"), *Path));
+
+	UEdGraph* ContainerGraph = nullptr;
+	for (UEdGraph* G : Blueprint->FunctionGraphs)
+	{
+		if (G && G->GetName() == GraphName) { ContainerGraph = G; break; }
+	}
+	if (!ContainerGraph)
+		return MakeError(FString::Printf(TEXT("Function graph not found: %s"), *GraphName));
+
+	UAnimGraphNode_StateMachine* SMNode = FindStateMachineNode(ContainerGraph, NodeNameFilter);
+	if (!SMNode || !SMNode->EditorStateMachineGraph)
+		return MakeError(TEXT("State machine node not found"));
+	UAnimationStateMachineGraph* SMGraph = SMNode->EditorStateMachineGraph;
+
+	FGuid TransitionGuid;
+	if (!FGuid::Parse(TransitionGuidStr, TransitionGuid))
+		return MakeError(TEXT("transition_guid is not a valid GUID"));
+
+	UAnimStateTransitionNode* Transition = nullptr;
+	for (UEdGraphNode* Node : SMGraph->Nodes)
+	{
+		if (UAnimStateTransitionNode* Trans = Cast<UAnimStateTransitionNode>(Node))
+		{
+			if (Trans->NodeGuid == TransitionGuid) { Transition = Trans; break; }
+		}
+	}
+	if (!Transition)
+		return MakeError(FString::Printf(TEXT("Transition with guid %s not found"), *TransitionGuidStr));
+	if (!Transition->BoundGraph)
+		return MakeError(TEXT("Transition has no BoundGraph"));
+
+	UEdGraph* RuleGraph = Transition->BoundGraph;
+
+	UK2Node_BreakStruct* BreakNode = nullptr;
+	for (UEdGraphNode* RNode : RuleGraph->Nodes)
+	{
+		if (UK2Node_BreakStruct* Candidate = Cast<UK2Node_BreakStruct>(RNode))
+		{
+			if (Candidate->FindPin(*ExistingPinName, EGPD_Output) && Candidate->FindPin(*NewPinName, EGPD_Output))
+			{
+				BreakNode = Candidate;
+				break;
+			}
+		}
+	}
+	if (!BreakNode)
+		return MakeError(FString::Printf(TEXT("No BreakStruct node in this rule graph has both pins '%s' and '%s'"), *ExistingPinName, *NewPinName));
+
+	UEdGraphPin* ExistingPin = BreakNode->FindPin(*ExistingPinName, EGPD_Output);
+	UEdGraphPin* NewPin = BreakNode->FindPin(*NewPinName, EGPD_Output);
+	if (!ExistingPin || !NewPin)
+		return MakeError(TEXT("Failed to resolve both pins after locating the BreakStruct node"));
+	if (ExistingPin->LinkedTo.Num() != 1)
+		return MakeError(FString::Printf(TEXT("Expected '%s' to have exactly one existing link, found %d"), *ExistingPinName, ExistingPin->LinkedTo.Num()));
+
+	UEdGraphPin* ConsumerPin = ExistingPin->LinkedTo[0];
+	if (!ConsumerPin || !ConsumerPin->GetOwningNode())
+		return MakeError(TEXT("Existing pin's link target is invalid"));
+
+	// Break the direct link before rewiring - MakeLinkTo on a pin that
+	// already expects a single input silently replaces it, but breaking
+	// first keeps this an explicit, easy-to-follow two-step rewire.
+	ExistingPin->BreakLinkTo(ConsumerPin);
+
+	UFunction* OrFunction = UKismetMathLibrary::StaticClass()->FindFunctionByName(TEXT("BooleanOR"));
+	if (!OrFunction)
+		return MakeError(TEXT("UKismetMathLibrary::BooleanOR not found - engine API changed?"));
+
+	UK2Node_CallFunction* OrNode = NewObject<UK2Node_CallFunction>(RuleGraph);
+	OrNode->SetFromFunction(OrFunction);
+	OrNode->CreateNewGuid();
+	RuleGraph->AddNode(OrNode, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+	OrNode->NodePosX = BreakNode->NodePosX + 200;
+	OrNode->NodePosY = BreakNode->NodePosY + 100;
+	OrNode->AllocateDefaultPins();
+
+	UEdGraphPin* OrPinA = OrNode->FindPin(TEXT("A"), EGPD_Input);
+	UEdGraphPin* OrPinB = OrNode->FindPin(TEXT("B"), EGPD_Input);
+	UEdGraphPin* OrPinReturn = OrNode->FindPin(TEXT("ReturnValue"), EGPD_Output);
+	if (!OrPinA || !OrPinB || !OrPinReturn)
+		return MakeError(TEXT("BooleanOR node did not expose the expected A/B/ReturnValue pins"));
+
+	ExistingPin->MakeLinkTo(OrPinA);
+	NewPin->MakeLinkTo(OrPinB);
+	OrPinReturn->MakeLinkTo(ConsumerPin);
+
+	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+	UEditorAssetLibrary::SaveAsset(Path, false);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("or_node_guid"), OrNode->NodeGuid.ToString());
+	Data->SetStringField(TEXT("existing_pin"), ExistingPinName);
+	Data->SetStringField(TEXT("new_pin"), NewPinName);
+	Data->SetStringField(TEXT("consumer_node_guid"), ConsumerPin->GetOwningNode()->NodeGuid.ToString());
+	Data->SetStringField(TEXT("consumer_pin"), ConsumerPin->PinName.ToString());
+	Data->SetObjectField(TEXT("rule"), SummarizeTransitionRule(RuleGraph));
 	return MakeResponse(true, Data);
 }

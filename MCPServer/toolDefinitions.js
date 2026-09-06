@@ -2383,6 +2383,50 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "read_state_machine",
+        description: "Reads an AnimGraph state machine's states and transitions (with each transition's rule graph nodes/pins). No other tool can see past the containing AnimGraphNode_StateMachine node - read_function_graphs/read_event_graph_detailed only walk Blueprint->FunctionGraphs/UbergraphPages directly, and a state machine's states/transitions live in a nested UAnimationStateMachineGraph reachable only via that node's own EditorStateMachineGraph property. Use this before ever editing a state machine (e.g. before duplicate_state_transition).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Full path to the Animation Blueprint asset" },
+            graph_name: { type: "string", description: "Name of the function graph containing the state machine node, e.g. an Anim Layer function name like 'OverlayLayer'" },
+            state_machine_node_name: { type: "string", description: "Filter matching the state machine node's title or its bound graph's name (e.g. 'Overlay States'). Omit to return the first state machine node found in the graph." },
+          },
+          required: ["blueprint_path", "graph_name"],
+        },
+      },
+      {
+        name: "duplicate_state_transition",
+        description: "Clones an existing state-machine transition (including its BoundGraph rule graph) so a new target state can be entered from the same origin state an existing transition already uses, without hand-authoring a brand-new transition edge from scratch. Common use: giving a newly-added enum value (e.g. a new EALSOverlayState entry) an entry transition into an existing state that already has working rendering/pose logic (e.g. reusing Torch's pose for a new Sword value) by cloning whatever transition currently enters that state. The cloned rule graph still contains the SOURCE transition's original enum-literal comparison - follow up with set_pin_default on the new rule graph's comparison node (see read_state_machine's transitions[].rule.nodes for the guid/pin to target) to point it at the new enum value. Read the state machine first via read_state_machine to find the source_transition_guid and confirm the target state's exact name.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Full path to the Animation Blueprint asset" },
+            graph_name: { type: "string", description: "Name of the function graph containing the state machine node" },
+            state_machine_node_name: { type: "string", description: "Filter matching the state machine node's title or bound graph name, same as read_state_machine" },
+            source_transition_guid: { type: "string", description: "node_guid of the transition to clone, from read_state_machine's transitions[] array. Its origin (from_state) is kept as-is on the clone." },
+            new_target_state_name: { type: "string", description: "Name of an existing state (from read_state_machine's states[].name) to point the cloned transition's target at" },
+          },
+          required: ["blueprint_path", "graph_name", "source_transition_guid", "new_target_state_name"],
+        },
+      },
+      {
+        name: "add_enum_or_condition_to_transition_rule",
+        description: "Widens an existing state-machine transition rule from 'field X' to 'field X OR field Y', where X and Y are two bool output pins on the same K2Node_BreakStruct node inside the rule's BoundGraph - ALS's own pattern for gating a transition on one FALSOverlayState field (a 'Break ALSOverlay State' node exposes one bool output pin per struct field, including newly-added ones, left unlinked until used). Rewires whatever the existing field's pin was plugged into (a Result node, a NOT node, anything) to instead come from a new BooleanOR node combining both fields. Use read_state_machine first to find the transition_guid and the exact pin names (e.g. 'Torch_' already wired, 'Sword_' unwired) from its rule.nodes.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            blueprint_path: { type: "string", description: "Full path to the Animation Blueprint asset" },
+            graph_name: { type: "string", description: "Name of the function graph containing the state machine node" },
+            state_machine_node_name: { type: "string", description: "Filter matching the state machine node's title or bound graph name, same as read_state_machine" },
+            transition_guid: { type: "string", description: "node_guid of the transition whose rule to widen, from read_state_machine's transitions[] array" },
+            existing_bool_pin_name: { type: "string", description: "The BreakStruct output pin currently driving this rule, e.g. 'Torch_'" },
+            new_bool_pin_name: { type: "string", description: "The BreakStruct output pin to OR in, e.g. 'Sword_'" },
+          },
+          required: ["blueprint_path", "graph_name", "transition_guid", "existing_bool_pin_name", "new_bool_pin_name"],
+        },
+      },
+      {
         name: "import_texture",
         description: "Import an image file (jpg/png/tga/etc.) from disk as a Texture2D, via UTextureFactory's legacy synchronous FactoryCreateBinary API - deliberately bypasses AssetTools.import_asset_tasks/Interchange, which crashes the editor when called from this MCP's own command-handling context (a TaskGraph recursion assertion - see AGENTS.md). Use this for any scripted texture import instead of the Python AssetTools path.",
         inputSchema: {

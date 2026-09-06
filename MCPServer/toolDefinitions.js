@@ -1703,7 +1703,7 @@ export const MCP_TOOL_DEFINITIONS = [
           properties: {
             op: {
               type: "string",
-              description: "Operation: duplicate_asset, does_asset_exist, save_asset, inspect_asset, set_property, open_asset, export_fbx, inspect_graph_node, set_graph_node_property",
+              description: "Operation: duplicate_asset, does_asset_exist, save_asset, inspect_asset, set_property, open_asset, export_fbx, inspect_graph_node, set_graph_node_property, duplicate_node",
             },
             source_path: { type: "string", description: "For duplicate_asset" },
             dest_path: { type: "string", description: "For duplicate_asset" },
@@ -1712,9 +1712,11 @@ export const MCP_TOOL_DEFINITIONS = [
             max_depth: { type: "number", description: "For inspect_asset / inspect_graph_node (default 4 / 2)" },
             property: { type: "string", description: "For set_property / set_graph_node_property: property name on the object" },
             value: { type: "string", description: "For set_property / set_graph_node_property: value as text (FProperty::ImportText_Direct format)" },
-            blueprint_path: { type: "string", description: "For inspect_graph_node / set_graph_node_property: Blueprint asset path" },
-            graph_name: { type: "string", description: "For inspect_graph_node / set_graph_node_property: name of the graph containing the node (e.g. 'AnimGraph', 'HandIK')" },
-            node_guid: { type: "string", description: "For inspect_graph_node / set_graph_node_property: node GUID from read_function_graphs/read_event_graph" },
+            blueprint_path: { type: "string", description: "For inspect_graph_node / set_graph_node_property / duplicate_node: Blueprint asset path" },
+            graph_name: { type: "string", description: "For inspect_graph_node / set_graph_node_property / duplicate_node: name of the graph containing the node (e.g. 'AnimGraph', 'HandIK', a function graph name)" },
+            node_guid: { type: "string", description: "For inspect_graph_node / set_graph_node_property / duplicate_node: node GUID from read_function_graphs/read_event_graph (the node to act on, or to clone for duplicate_node)" },
+            dx: { type: "number", description: "For duplicate_node: X position offset for the new node relative to the source (default 0)" },
+            dy: { type: "number", description: "For duplicate_node: Y position offset for the new node relative to the source (default 200)" },
           },
           required: ["op"],
         },

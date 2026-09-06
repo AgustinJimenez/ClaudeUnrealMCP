@@ -11,6 +11,7 @@
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "EdGraph/EdGraph.h"
 #include "EdGraph/EdGraphNode.h"
+#include "EdGraphUtilities.h"
 
 // Serialize a UObject's properties into a JSON object for inspection.
 // Recursively inlines Instanced sub-objects up to MaxDepth.
@@ -413,6 +414,90 @@ FString FMCPServer::HandleRunPython(const TSharedPtr<FJsonObject>& Params)
 			Data->SetBoolField(TEXT("set"), true);
 			return MakeResponse(true, Data);
 		}
+	}
+
+	else if (Op == TEXT("duplicate_node"))
+	{
+		// Clone an existing graph node (any K2Node type) via copy/paste text serialization -
+		// FEdGraphUtilities::ExportNodesToText/ImportNodesFromText is the same path the editor's
+		// own Ctrl+C/Ctrl+V uses, so pin defaults, node-specific properties, and comments all
+		// carry over correctly (unlike hand-rolling NewObject+AllocateDefaultPins, which loses
+		// anything not set by AllocateDefaultPins). Links to nodes outside the copied set are
+		// dropped automatically, so the clone starts fully disconnected - wire it up afterward
+		// with connect_nodes and re-point its literal pin defaults with set_pin_default.
+		// params: blueprint_path, graph_name, node_guid (source node to clone)
+		// optional: dx, dy (position offset for the new node relative to the source; default 0, 200)
+		FString BPPath, GraphName, NodeGuidStr;
+		if (!Params->TryGetStringField(TEXT("blueprint_path"), BPPath) ||
+			!Params->TryGetStringField(TEXT("graph_name"), GraphName) ||
+			!Params->TryGetStringField(TEXT("node_guid"), NodeGuidStr))
+		{
+			return MakeError(TEXT("duplicate_node requires blueprint_path, graph_name, node_guid"));
+		}
+
+		UBlueprint* Blueprint = LoadBlueprintFromPath(BPPath);
+		if (!Blueprint)
+		{
+			return MakeError(FString::Printf(TEXT("Blueprint not found: %s"), *BPPath));
+		}
+
+		TArray<UEdGraph*> AllGraphs;
+		Blueprint->GetAllGraphs(AllGraphs);
+
+		UEdGraph* TargetGraph = nullptr;
+		UEdGraphNode* SourceNode = nullptr;
+		for (UEdGraph* Graph : AllGraphs)
+		{
+			if (!Graph || Graph->GetName() != GraphName) continue;
+			for (UEdGraphNode* Node : Graph->Nodes)
+			{
+				if (Node && (Node->NodeGuid.ToString() == NodeGuidStr ||
+					Node->NodeGuid.ToString(EGuidFormats::DigitsWithHyphensInBraces) == NodeGuidStr ||
+					Node->NodeGuid.ToString(EGuidFormats::Digits) == NodeGuidStr))
+				{
+					SourceNode = Node;
+					TargetGraph = Graph;
+					break;
+				}
+			}
+			if (SourceNode) break;
+		}
+
+		if (!SourceNode || !TargetGraph)
+		{
+			return MakeError(FString::Printf(TEXT("Node with GUID '%s' not found in graph '%s'"), *NodeGuidStr, *GraphName));
+		}
+
+		FString ExportedText;
+		FEdGraphUtilities::ExportNodesToText(TSet<UObject*>{ SourceNode }, ExportedText);
+		if (ExportedText.IsEmpty())
+		{
+			return MakeError(TEXT("Failed to export source node for duplication"));
+		}
+
+		TSet<UEdGraphNode*> ImportedNodes;
+		FEdGraphUtilities::ImportNodesFromText(TargetGraph, ExportedText, ImportedNodes);
+
+		if (ImportedNodes.Num() != 1)
+		{
+			return MakeError(FString::Printf(TEXT("Expected 1 imported node, got %d"), ImportedNodes.Num()));
+		}
+
+		UEdGraphNode* NewNode = ImportedNodes.Array()[0];
+		NewNode->CreateNewGuid();
+
+		double DX = 0.0, DY = 200.0;
+		Params->TryGetNumberField(TEXT("dx"), DX);
+		Params->TryGetNumberField(TEXT("dy"), DY);
+		NewNode->NodePosX += static_cast<int32>(DX);
+		NewNode->NodePosY += static_cast<int32>(DY);
+
+		FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+
+		Data->SetStringField(TEXT("new_node_id"), NewNode->NodeGuid.ToString(EGuidFormats::DigitsWithHyphensLower));
+		Data->SetNumberField(TEXT("pos_x"), NewNode->NodePosX);
+		Data->SetNumberField(TEXT("pos_y"), NewNode->NodePosY);
+		return MakeResponse(true, Data);
 	}
 
 	return MakeError(FString::Printf(TEXT("Unknown op: %s"), *Op));

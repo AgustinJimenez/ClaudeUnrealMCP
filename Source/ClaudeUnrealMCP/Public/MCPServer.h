@@ -155,6 +155,7 @@ private:
 	FString HandleAddEnumOrConditionToTransitionRule(const TSharedPtr<FJsonObject>& Params);
 	FString HandleAddStaticMeshSocket(const TSharedPtr<FJsonObject>& Params);
 	FString HandleListStaticMeshSockets(const TSharedPtr<FJsonObject>& Params);
+	FString HandleSetStaticMeshSocketTransform(const TSharedPtr<FJsonObject>& Params);
 
 	// State Trees + Audio + Landscape (Sprint 24-26)
 	FString HandleCreateStateTree(const TSharedPtr<FJsonObject>& Params);

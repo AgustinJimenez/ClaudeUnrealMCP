@@ -2456,6 +2456,24 @@ export const MCP_TOOL_DEFINITIONS = [
         },
       },
       {
+        name: "set_static_mesh_socket_transform",
+        description: "Updates the local location/rotation of an existing mesh-level socket (UStaticMeshSocket) on a StaticMesh asset. Any axis omitted keeps its current value. Use this to re-tune a weapon's 'Grip' socket in place without deleting and recreating it.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mesh_path: { type: "string", description: "Full path to the StaticMesh asset" },
+            socket_name: { type: "string", description: "Name of the existing socket to update, e.g. 'Grip'" },
+            x: { type: "number", description: "Local location X" },
+            y: { type: "number", description: "Local location Y" },
+            z: { type: "number", description: "Local location Z" },
+            pitch: { type: "number", description: "Local rotation pitch in degrees" },
+            yaw: { type: "number", description: "Local rotation yaw in degrees" },
+            roll: { type: "number", description: "Local rotation roll in degrees" },
+          },
+          required: ["mesh_path", "socket_name"],
+        },
+      },
+      {
         name: "import_texture",
         description: "Import an image file (jpg/png/tga/etc.) from disk as a Texture2D, via UTextureFactory's legacy synchronous FactoryCreateBinary API - deliberately bypasses AssetTools.import_asset_tasks/Interchange, which crashes the editor when called from this MCP's own command-handling context (a TaskGraph recursion assertion - see AGENTS.md). Use this for any scripted texture import instead of the Python AssetTools path.",
         inputSchema: {

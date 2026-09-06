@@ -245,3 +245,44 @@ FString FMCPServer::HandleListStaticMeshSockets(const TSharedPtr<FJsonObject>& P
 	Data->SetNumberField(TEXT("count"), SocketArray.Num());
 	return MakeResponse(true, Data);
 }
+
+FString FMCPServer::HandleSetStaticMeshSocketTransform(const TSharedPtr<FJsonObject>& Params)
+{
+	if (!Params.IsValid()) return MakeError(TEXT("Missing params"));
+
+	FString MeshPath, SocketName;
+	if (!Params->TryGetStringField(TEXT("mesh_path"), MeshPath))
+		return MakeError(TEXT("mesh_path required"));
+	if (!Params->TryGetStringField(TEXT("socket_name"), SocketName))
+		return MakeError(TEXT("socket_name required"));
+
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *MeshPath);
+	if (!Mesh)
+		return MakeError(FString::Printf(TEXT("StaticMesh not found: %s"), *MeshPath));
+
+	const FName SocketFName(*SocketName);
+	UStaticMeshSocket* Socket = Mesh->FindSocket(SocketFName);
+	if (!Socket)
+		return MakeError(FString::Printf(TEXT("Socket not found: %s (use add_static_mesh_socket to create it)"), *SocketName));
+
+	double X = Socket->RelativeLocation.X, Y = Socket->RelativeLocation.Y, Z = Socket->RelativeLocation.Z;
+	double Pitch = Socket->RelativeRotation.Pitch, Yaw = Socket->RelativeRotation.Yaw, Roll = Socket->RelativeRotation.Roll;
+	Params->TryGetNumberField(TEXT("x"), X);
+	Params->TryGetNumberField(TEXT("y"), Y);
+	Params->TryGetNumberField(TEXT("z"), Z);
+	Params->TryGetNumberField(TEXT("pitch"), Pitch);
+	Params->TryGetNumberField(TEXT("yaw"), Yaw);
+	Params->TryGetNumberField(TEXT("roll"), Roll);
+
+	Mesh->Modify();
+	Socket->RelativeLocation = FVector(X, Y, Z);
+	Socket->RelativeRotation = FRotator(Pitch, Yaw, Roll);
+	UEditorAssetLibrary::SaveAsset(MeshPath, false);
+
+	TSharedPtr<FJsonObject> Data = MakeShared<FJsonObject>();
+	Data->SetStringField(TEXT("mesh_path"), MeshPath);
+	Data->SetStringField(TEXT("socket_name"), SocketName);
+	Data->SetStringField(TEXT("location"), Socket->RelativeLocation.ToString());
+	Data->SetStringField(TEXT("rotation"), Socket->RelativeRotation.ToString());
+	return MakeResponse(true, Data);
+}
